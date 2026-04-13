@@ -16,12 +16,16 @@ class PerfectMindScraper(BaseScraper):
         widget_id: str,
         account_id: str | None = "23902",
         start_path: str | None = None,
+        seed_urls: list[str] | None = None,
+        use_playwright: bool = True,
     ):
         super().__init__(source_id_prefix=f"pm_{subdomain}", municipality=municipality)
         self.subdomain = subdomain
         self.base_url = f"https://{subdomain}.perfectmind.com"
         self.widget_id = widget_id
         self.account_id = account_id
+        self.use_playwright = use_playwright
+        self.seed_urls = {self._normalize_link(url) for url in (seed_urls or [])}
 
         if start_path:
             self.start_url = urljoin(f"{self.base_url}/", start_path.lstrip("/"))
@@ -179,11 +183,15 @@ class PerfectMindScraper(BaseScraper):
     async def _async_scrape(self):
         print(f"[{self.municipality}] Starting Playwright scrape...")
         all_events_raw = []
-        categories = self._extract_category_links()
+        categories = set(self.seed_urls)
+        categories.update(self._extract_category_links())
         direct_events, handled_urls = self._extract_direct_page_events(categories)
         all_events_raw.extend(direct_events)
         if direct_events:
             print(f"[{self.municipality}] Direct page extraction found {len(direct_events)} events.")
+
+        if not self.use_playwright:
+            return all_events_raw
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)

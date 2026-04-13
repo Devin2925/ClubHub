@@ -9,9 +9,12 @@ import requests
 from scrapers.base import BaseScraper, classify_sport, strip_html
 
 
-LANDING_URL = "https://explore.wspr.ca/Westshore/public/category/browse/DROP_SPORTS"
+LANDING_URL = "https://explore.wspr.ca/Westshore/public/category/browse/dropin"
 BASE_URL = "https://explore.wspr.ca"
 OUTDOOR_PICKLEBALL_URL = "https://explore.wspr.ca/Westshore/public/booking/items/PICKLEBALLCOURTSONLINE"
+WEEK_RANGE_WEEKS = 10
+SCHEDULE_WINDOW_DAYS = 30
+SCHEDULE_WINDOW_COUNT = 3
 
 
 class WSPRScraper(BaseScraper):
@@ -20,21 +23,46 @@ class WSPRScraper(BaseScraper):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "Mozilla/5.0"})
 
-    def _fetch_sport_pages(self) -> list[str]:
-        response = self.session.get(LANDING_URL, timeout=30)
-        response.raise_for_status()
-        text = response.text
+    def _discover_schedule_pages(self) -> list[str]:
+        queue = [LANDING_URL]
+        visited = set()
+        pages_with_data = set()
 
-        paths = sorted(
-            set(
+        while queue:
+            page_url = queue.pop(0)
+            if page_url in visited:
+                continue
+            visited.add(page_url)
+
+            response = self.session.get(page_url, timeout=30)
+            if response.status_code == 404 or "Error/PageNotFound" in response.url:
+                continue
+            response.raise_for_status()
+            text = response.text
+
+            if (
+                "data-class-name=" in text
+                or 'action="/Westshore/public/category/ClassGrid"' in text
+                or 'action="/Westshore/public/category/ClassSchedule"' in text
+            ):
+                pages_with_data.add(page_url)
+
+            paths = set(
                 re.findall(
-                    r'/Westshore/public/category/browse/'
-                    r'(?:drop-in_sports_[A-Za-z0-9_\-]+|dropin_sport_[A-Za-z0-9_\-]+|drop_sport_[A-Za-z0-9_\-]+)',
+                    r'/Westshore/public/category/browse/[A-Za-z0-9_\-]+',
                     text,
                 )
             )
-        )
-        return [urljoin(BASE_URL, path) for path in paths]
+
+            for path in paths:
+                lowered = path.lower()
+                if any(skip in lowered for skip in ("programs", "rates_passes", "explore_facilities", "fac_")):
+                    continue
+                absolute = urljoin(BASE_URL, path)
+                if absolute not in visited and absolute not in queue:
+                    queue.append(absolute)
+
+        return sorted(pages_with_data)
 
     def _extract_attr(self, block: str, name: str) -> str:
         match = re.search(rf"{name}='(.*?)'", block, re.S)
@@ -137,6 +165,248 @@ class WSPRScraper(BaseScraper):
             normalized = self._normalize_block(page_url, block)
             if normalized:
                 events.append(normalized)
+        return events
+
+    def _normalize_schedule_card(
+        self,
+        page_url: str,
+        *,
+        title: str,
+        date_str: str,
+        time_str: str,
+        venue: str,
+        location: str,
+        description: str,
+        spaces: str,
+    ) -> dict | None:
+        cleaned_time = re.sub(r"\s+", " ", time_str.strip())
+        if " - " not in cleaned_time:
+            return None
+
+        try:
+            start_time, end_time = self._parse_datetime_range(date_str.strip(), cleaned_time)
+        except ValueError:
+            return None
+
+        venue_name = venue or "Juan de Fuca Rec Centre"
+        raw_key = "|".join([title, date_str, cleaned_time, venue_name, location])
+        source_hash = hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:16]
+
+        description = description.strip()
+        if spaces:
+            description = f"{description} Spaces: {spaces}".strip()
+
+        return {
+            "source_id": f"{self.source_id_prefix}_{source_hash}",
+            "title": title,
+            "sport_type": classify_sport(title),
+            "venue_name": venue_name,
+            "facility_name": location,
+            "start_time": start_time,
+            "end_time": end_time,
+            "price": "",
+            "description": description,
+            "booking_url": page_url,
+            "source": self.source_id_prefix,
+            "municipality": self.municipality,
+        }
+
+    def _parse_classschedule_cards(self, page_url: str, text: str) -> list[dict]:
+        start_index = text.find('classTimetableSchedule">')
+        end_index = text.find('<div class="modal fade" id="MoreInfoModal"')
+        if start_index == -1 or end_index == -1 or end_index <= start_index:
+            return []
+
+        section = text[start_index:end_index]
+        card_blocks = re.findall(r'<div class="card mb-4">(.*?)</div>\s*</div>', section, re.S)
+        events = []
+
+        for block in card_blocks:
+            if "<h4>" not in block:
+                continue
+
+            title_match = re.search(r"<h4>(.*?)</h4>", block, re.S)
+            date_match = re.search(r"Date:\s*</span>\s*(.*?)\s*</p>", block, re.S)
+            time_match = re.search(r"Time:\s*</span>\s*(.*?)\s*(?:<span|</p>)", block, re.S)
+            location_match = re.search(r'd-location.*?Location:\s*</span>\s*(.*?)\s*</p>', block, re.S)
+            venue_match = re.search(r'd-venue.*?Venue:\s*</span>(.*?)</p>', block, re.S)
+            spaces_match = re.search(r"Spaces:\s*</span>\s*(.*?)\s*</p>", block, re.S)
+            description_match = re.search(r'data-class-description="(.*?)"', block, re.S)
+
+            title = strip_html(title_match.group(1)) if title_match else ""
+            date_str = strip_html(date_match.group(1)) if date_match else ""
+            time_str = strip_html(time_match.group(1)) if time_match else ""
+            location = strip_html(location_match.group(1)) if location_match else ""
+            spaces = strip_html(spaces_match.group(1)) if spaces_match else ""
+            description = unescape(description_match.group(1)).replace("\r", " ").replace("\n", " ").strip() if description_match else ""
+
+            venue = ""
+            if venue_match:
+                venue = strip_html(re.sub(r"<a.*?</a>", " ", venue_match.group(1), flags=re.S))
+
+            normalized = self._normalize_schedule_card(
+                page_url,
+                title=title,
+                date_str=date_str,
+                time_str=time_str,
+                venue=venue,
+                location=location,
+                description=description,
+                spaces=spaces,
+            )
+            if normalized:
+                events.append(normalized)
+
+        return events
+
+    def _fetch_classschedule_result_pages(self, text: str) -> list[str]:
+        pages = [text]
+        seen_urls = set()
+
+        for match in re.findall(r'href="(/Westshore/public/Category/ClassSchedule[^"#]+)#results"', text, re.I):
+            absolute = urljoin(BASE_URL, match)
+            if absolute in seen_urls:
+                continue
+            seen_urls.add(absolute)
+            response = self.session.get(absolute, timeout=30)
+            response.raise_for_status()
+            pages.append(response.text)
+
+        return pages
+
+    def _parse_classschedule_page(self, page_url: str) -> list[dict]:
+        response = self.session.get(page_url, timeout=30)
+        response.raise_for_status()
+        text = response.text
+
+        if 'action="/Westshore/public/category/ClassSchedule"' not in text:
+            return []
+
+        token = self._extract_first(
+            text,
+            r'name="__RequestVerificationToken"[^>]*value="([^"]+)"',
+        )
+        start_date = self._extract_first(
+            text,
+            r'name="StartDate"[^>]*value="([^"]+)"',
+        )
+        category_guid = self._extract_first(
+            text,
+            r'name="CategoryGUID"[^>]*value="([^"]+)"',
+        )
+
+        if not token or not start_date or not category_guid:
+            return []
+
+        try:
+            base_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            return []
+
+        events = []
+        seen_ids = set()
+
+        for window_index in range(SCHEDULE_WINDOW_COUNT):
+            window_start = base_start + timedelta(days=SCHEDULE_WINDOW_DAYS * window_index)
+            window_end = window_start + timedelta(days=SCHEDULE_WINDOW_DAYS)
+            schedule_response = self.session.post(
+                urljoin(BASE_URL, "/Westshore/public/category/ClassSchedule"),
+                data={
+                    "__RequestVerificationToken": token,
+                    "StartDate": window_start.isoformat(),
+                    "EndDate": window_end.isoformat(),
+                    "CategoryGUID": category_guid,
+                },
+                timeout=30,
+            )
+            schedule_response.raise_for_status()
+
+            for page_text in self._fetch_classschedule_result_pages(schedule_response.text):
+                for normalized in self._parse_classschedule_cards(page_url, page_text):
+                    if normalized["start_time"] < datetime.now() - timedelta(days=1):
+                        continue
+                    if normalized["source_id"] in seen_ids:
+                        continue
+                    seen_ids.add(normalized["source_id"])
+                    events.append(normalized)
+
+        return events
+
+    def _extract_first(self, text: str, pattern: str) -> str:
+        match = re.search(pattern, text, re.I | re.S)
+        return match.group(1).strip() if match else ""
+
+    def _parse_classgrid_page(self, page_url: str) -> list[dict]:
+        response = self.session.get(page_url, timeout=30)
+        response.raise_for_status()
+        text = response.text
+
+        if 'action="/Westshore/public/category/ClassGrid"' not in text:
+            return []
+
+        token = self._extract_first(
+            text,
+            r'name="__RequestVerificationToken"[^>]*value="([^"]+)"',
+        )
+        start_date = self._extract_first(
+            text,
+            r'name="StartDate"[^>]*value="([^"]+)"',
+        )
+        category_guid = self._extract_first(
+            text,
+            r'name="CategoryGUID"[^>]*value="([^"]+)"',
+        )
+
+        if not token or not start_date or not category_guid:
+            return []
+
+        try:
+            base_week = datetime.strptime(start_date, "%Y-%m-%d %I:%M:%S %p")
+        except ValueError:
+            return []
+
+        events = []
+        seen_ids = set()
+
+        for week_index in range(WEEK_RANGE_WEEKS):
+            week_start = base_week + timedelta(days=7 * week_index)
+            grid_response = self.session.post(
+                urljoin(BASE_URL, "/Westshore/public/category/ClassGrid"),
+                data={
+                    "__RequestVerificationToken": token,
+                    "StartDate": week_start.strftime("%Y-%m-%d %I:%M:%S %p"),
+                    "CategoryGUID": category_guid,
+                },
+                timeout=30,
+            )
+            grid_response.raise_for_status()
+
+            blocks = re.findall(
+                r"<button[^>]*data-bs-target='#classGridInfo'[^>]*>.*?</button>",
+                grid_response.text,
+                re.S,
+            )
+            if not blocks:
+                continue
+
+            for block in blocks:
+                normalized = self._normalize_block(page_url, block)
+                if not normalized:
+                    continue
+                if normalized["start_time"] < datetime.now() - timedelta(days=1):
+                    continue
+                if normalized["venue_name"] == "West Shore":
+                    normalized["venue_name"] = "Juan de Fuca Rec Centre"
+                if not normalized["facility_name"]:
+                    normalized["facility_name"] = self._extract_first(
+                        grid_response.text,
+                        r"<title>(.*?) - Westshore</title>",
+                    )
+                if normalized["source_id"] in seen_ids:
+                    continue
+                seen_ids.add(normalized["source_id"])
+                events.append(normalized)
+
         return events
 
     def _extract_outdoor_date_range(self, text: str) -> list[str]:
@@ -242,7 +512,7 @@ class WSPRScraper(BaseScraper):
     def scrape(self):
         print(f"[{self.municipality}] Starting scrape...")
         try:
-            pages = self._fetch_sport_pages()
+            pages = self._discover_schedule_pages()
         except Exception as exc:
             print(f"[{self.municipality}] Source discovery failed: {exc}")
             return []
@@ -252,7 +522,13 @@ class WSPRScraper(BaseScraper):
 
         for page_url in pages:
             try:
-                page_events = self._parse_page(page_url)
+                page_text = self.session.get(page_url, timeout=30).text
+                if 'action="/Westshore/public/category/ClassSchedule"' in page_text:
+                    page_events = self._parse_classschedule_page(page_url)
+                else:
+                    page_events = self._parse_page(page_url)
+                if not page_events:
+                    page_events = self._parse_classgrid_page(page_url)
             except Exception as exc:
                 print(f"[{self.municipality}] Failed page {page_url}: {exc}")
                 continue

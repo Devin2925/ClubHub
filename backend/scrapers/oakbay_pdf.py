@@ -9,7 +9,7 @@ from pypdf import PdfReader
 from scrapers.base import BaseScraper, classify_sport
 
 
-RACQUET_PDF_URL = "https://www.oakbay.ca/wp-content/uploads/2026/03/RacquetSports-Drop-in-Schedule-Spring-2026.pdf"
+DROPIN_PAGE_URL = "https://www.oakbay.ca/parks-recreation/programs-registration-services/drop-in-schedules/"
 TARGET_SPORTS = {"pickleball", "badminton", "table-tennis", "squash"}
 DAY_TO_INDEX = {
     "Monday": 0,
@@ -28,8 +28,16 @@ class OakBayPDFScraper(BaseScraper):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "Mozilla/5.0"})
 
-    def _fetch_layout_text(self) -> str:
-        response = self.session.get(RACQUET_PDF_URL, timeout=30)
+    def _discover_pdf_url(self) -> str:
+        response = self.session.get(DROPIN_PAGE_URL, timeout=30)
+        response.raise_for_status()
+        matches = re.findall(r'https://www\.oakbay\.ca/wp-content/uploads/[^"\']+RacquetSports[^"\']+\.pdf', response.text, re.I)
+        if not matches:
+            raise ValueError("Could not find Oak Bay racquet PDF")
+        return matches[0]
+
+    def _fetch_layout_text(self, pdf_url: str) -> str:
+        response = self.session.get(pdf_url, timeout=30)
         response.raise_for_status()
         reader = PdfReader(BytesIO(response.content))
         return reader.pages[0].extract_text(extraction_mode="layout") or ""
@@ -155,7 +163,7 @@ class OakBayPDFScraper(BaseScraper):
 
         return True
 
-    def _build_occurrences(self, weekday: str, events: list[dict]) -> list[dict]:
+    def _build_occurrences(self, weekday: str, events: list[dict], pdf_url: str) -> list[dict]:
         today = datetime.utcnow().date()
         horizon = today + timedelta(days=35)
         weekday_index = DAY_TO_INDEX[weekday]
@@ -194,7 +202,7 @@ class OakBayPDFScraper(BaseScraper):
                             "end_time": end_dt,
                             "price": "",
                             "description": f"Oak Bay racquet sports PDF schedule. {event['note']}".strip(),
-                            "booking_url": RACQUET_PDF_URL,
+                            "booking_url": pdf_url,
                         }
                     )
             current += timedelta(days=1)
@@ -204,7 +212,8 @@ class OakBayPDFScraper(BaseScraper):
     def scrape(self):
         print(f"[{self.municipality}] Starting Oak Bay PDF scrape...")
         try:
-            layout_text = self._fetch_layout_text()
+            pdf_url = self._discover_pdf_url()
+            layout_text = self._fetch_layout_text(pdf_url)
             columns = self._split_day_columns(layout_text)
         except Exception as exc:
             print(f"[{self.municipality}] Oak Bay PDF discovery failed: {exc}")
@@ -215,7 +224,7 @@ class OakBayPDFScraper(BaseScraper):
 
         for weekday, lines in columns.items():
             day_events = self._parse_day_events(lines)
-            for event in self._build_occurrences(weekday, day_events):
+            for event in self._build_occurrences(weekday, day_events, pdf_url):
                 if event["source_id"] in seen_ids:
                     continue
                 seen_ids.add(event["source_id"])
