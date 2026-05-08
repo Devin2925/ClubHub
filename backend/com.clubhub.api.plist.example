@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.clubhub.sync</string>
+  <string>com.clubhub.api</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/devinmcnair/Desktop/ClubHub/backend/clubhub_sync.sh</string>
+    <string>/Users/devinmcnair/Desktop/ClubHub/backend/clubhub_api.sh</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -16,13 +16,19 @@
   <key>RunAtLoad</key>
   <true/>
 
-  <key>StartInterval</key>
-  <integer>259200</integer>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CLUBHUB_DEBUG</key>
+    <string>0</string>
+  </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/devinmcnair/Desktop/ClubHub/backend/logs/launchd.out.log</string>
+  <string>/Users/devinmcnair/Desktop/ClubHub/backend/logs/launchd.api.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/devinmcnair/Desktop/ClubHub/backend/logs/launchd.err.log</string>
+  <string>/Users/devinmcnair/Desktop/ClubHub/backend/logs/launchd.api.err.log</string>
 </dict>
 </plist>

@@ -10,7 +10,6 @@ from flask_cors import CORS
 from sqlalchemy import func
 
 from models import SessionLocal, Event, SourceSyncStatus, VenueSyncStatus, init_db
-from run_sync import list_sync_targets, run_all
 
 app = Flask(__name__)
 
@@ -38,7 +37,25 @@ CORS(app, origins=get_allowed_origins())
 
 SOURCE_FRESHNESS_WARNING_HOURS = 72
 SOURCE_FRESHNESS_STALE_HOURS = 168
-ADMIN_TOKEN = os.getenv("CLUBHUB_ADMIN_TOKEN", "").strip()
+
+
+def get_admin_token() -> str:
+    return os.getenv("CLUBHUB_ADMIN_TOKEN", "").strip()
+
+
+def get_server_config() -> tuple[str, int, bool]:
+    host = os.getenv("CLUBHUB_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    port = int(os.getenv("CLUBHUB_PORT", "5001"))
+    debug = os.getenv("CLUBHUB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    return host, port, debug
+
+
+def get_sync_module():
+    # Lazy import keeps API startup light and avoids loading all scraper modules
+    # until an endpoint actually needs sync logic.
+    from run_sync import list_sync_targets, run_all
+
+    return list_sync_targets, run_all
 
 
 def serialize_source_status(row: SourceSyncStatus) -> dict:
@@ -144,7 +161,7 @@ def is_admin_request() -> bool:
         return True
     if forwarded_for.startswith("127.0.0.1") or forwarded_for.startswith("::1"):
         return True
-    if ADMIN_TOKEN and provided_token == ADMIN_TOKEN:
+    if get_admin_token() and provided_token == get_admin_token():
         return True
     return False
 
@@ -322,6 +339,7 @@ def get_venue_status():
 
 @app.route("/api/sync-targets", methods=["GET"])
 def get_sync_targets():
+    list_sync_targets, _run_all = get_sync_module()
     return jsonify(list_sync_targets())
 
 
@@ -334,6 +352,7 @@ def trigger_scrape():
         payload = request.get_json(silent=True) or {}
         source_keys = payload.get("source_keys")
         municipalities = payload.get("municipalities")
+        _list_sync_targets, run_all = get_sync_module()
         run_all(source_keys=source_keys, municipalities=municipalities)
         db = SessionLocal()
         try:
@@ -491,5 +510,6 @@ def get_venue_alerts():
 # ─── Main ─────────────────────────────────────────────────────────
 if __name__ == "__main__":
     init_db()
-    print("ClubHub API running on http://localhost:5001")
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    host, port, debug = get_server_config()
+    print(f"ClubHub API running on http://{host}:{port} (debug={debug})")
+    app.run(host=host, port=port, debug=debug)

@@ -29,13 +29,13 @@ start_if_missing() {
 start_if_missing \
   "5001" \
   "backend" \
-  "cd '$BACKEND_DIR' && ./venv/bin/python app.py" \
+  "cd '$BACKEND_DIR' && env -u ELECTRON_RUN_AS_NODE ./venv/bin/python app.py" \
   "$LOG_DIR/backend_dev.log"
 
 start_if_missing \
   "3000" \
   "frontend" \
-  "cd '$FRONTEND_DIR' && npm run dev" \
+  "cd '$FRONTEND_DIR' && env -u ELECTRON_RUN_AS_NODE npm run dev" \
   "$LOG_DIR/frontend_dev.log"
 
 echo "Frontend: http://localhost:3000"

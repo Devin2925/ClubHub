@@ -58,19 +58,36 @@ class SaanichScraper(BaseScraper):
             resp = self.session.post(API_URL, json=payload, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            body = data.get("body", {})
+            if not isinstance(data, dict):
+                print(f"[Saanich] Unexpected response type for calendar {calendar_id}: {type(data).__name__}")
+                return []
+
+            body = data.get("body") or {}
+            if not isinstance(body, dict):
+                print(f"[Saanich] Unexpected body payload for calendar {calendar_id}: {type(body).__name__}")
+                return []
+
             all_events = []
 
             # Format 1
-            for group in body.get("calendar_group_list", []):
-                all_events.extend(group.get("events", []))
+            for group in body.get("calendar_group_list") or []:
+                if not isinstance(group, dict):
+                    continue
+                events = group.get("events") or []
+                if isinstance(events, list):
+                    all_events.extend([event for event in events if isinstance(event, dict)])
             
             # Format 2
-            for center in body.get("center_events", []):
-                all_events.extend(center.get("events", []))
+            for center in body.get("center_events") or []:
+                if not isinstance(center, dict):
+                    continue
+                events = center.get("events") or []
+                if isinstance(events, list):
+                    all_events.extend([event for event in events if isinstance(event, dict)])
 
             return all_events
-        except Exception:
+        except Exception as exc:
+            print(f"[Saanich] Calendar {calendar_id} fetch failed: {exc}")
             return []
 
     def _normalize_event(self, raw_event: dict) -> dict:
@@ -80,11 +97,18 @@ class SaanichScraper(BaseScraper):
         venue_name = "Saanich"
         facility_name = ""
         center_id = None
-        if raw_event.get("facilities"):
-            fac = raw_event["facilities"][0]
-            venue_name = fac.get("center_name", "Saanich").strip("* ")
-            facility_name = fac.get("facility_name", "")
-            center_id = fac.get("center_id")
+        facilities = raw_event.get("facilities") or []
+        if isinstance(facilities, list) and facilities:
+            fac = facilities[0] or {}
+            if isinstance(fac, dict):
+                venue_name = fac.get("center_name", "Saanich").strip("* ")
+                facility_name = fac.get("facility_name", "")
+                center_id = fac.get("center_id")
+
+        if not center_id:
+            center_id = raw_event.get("center_id")
+        if center_id in SAANICH_CENTERS:
+            venue_name = SAANICH_CENTERS[center_id]
 
         start_str = raw_event.get("start_time", "")
         end_str = raw_event.get("end_time", "")
@@ -95,7 +119,9 @@ class SaanichScraper(BaseScraper):
             start_time = datetime.utcnow()
             end_time = datetime.utcnow()
 
-        price_info = raw_event.get("price", {})
+        price_info = raw_event.get("price") or {}
+        if not isinstance(price_info, dict):
+            price_info = {}
         price = price_info.get("estimate_price", "")
         if price_info.get("free"):
             price = "Free"
@@ -126,6 +152,8 @@ class SaanichScraper(BaseScraper):
         for cal_id in CALENDAR_IDS_TO_TRY:
             raw_events = self._fetch_events(cal_id, center_ids)
             for ev in raw_events:
+                if not isinstance(ev, dict):
+                    continue
                 eid = ev.get("event_item_id")
                 if eid and eid not in seen_ids:
                     seen_ids.add(eid)
