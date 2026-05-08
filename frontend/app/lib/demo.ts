@@ -85,7 +85,11 @@ type DemoSnapshot = {
   venues: DemoVenueRow[];
 };
 
-export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const explicitDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const hasHostedApi = Boolean(process.env.NEXT_PUBLIC_API_URL);
+const isVercelRuntime = process.env.VERCEL === "1";
+
+export const DEMO_MODE = explicitDemoMode || (isVercelRuntime && !hasHostedApi);
 
 export function getDemoSnapshot(): DemoSnapshot {
   return snapshot as DemoSnapshot;
