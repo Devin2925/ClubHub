@@ -21,6 +21,5 @@ backend/com.clubhub.sync.plist
 
 backend/clubhub.db
 clubhub.db
-frontend/data/demo-snapshot.json
 
 .vercel/
