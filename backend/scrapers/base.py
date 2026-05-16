@@ -19,7 +19,11 @@ SPORT_PATTERNS = [
     (r"squash|racquetball", "squash"),
     (r"archery", "archery"),
     (r"skating|figure\s*skat|ice\s*play|public\s*skat|adult\s*skate|skate\s*-", "skating"),
-    (r"swim|aqua|pool|water|lengths|widths|family\s*swim|fun\s*and\s*features\s*swim", "swimming"),
+    (
+        r"swim|aqua|pool|water|lengths|widths|family\s*swim|fun\s*and\s*features\s*swim|"
+        r"lessons\s*&\s*leisure",
+        "swimming",
+    ),
     (
         r"fitness|weight|cardio|yoga|pilates|zumba|aerobic|body\s*sculpt|hiit|"
         r"circuit|cycle\s*(fit|&|\s*and)|strength|stretch|hi\s*lo|low\s*impact|"
@@ -64,6 +68,7 @@ DROPOIN_PATTERNS = [
     r"\blengths\b",
     r"family\s*swim",
     r"fun\s*and\s*features\s*swim",
+    r"lessons\s*&\s*leisure",
     r"adult\s*skate",
     r"tot\s*hockey",
     r"ice\s*play",

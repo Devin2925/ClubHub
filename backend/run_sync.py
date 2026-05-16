@@ -20,6 +20,7 @@ from scrapers.oakbay_pdf import OakBayPDFScraper
 from scrapers.oakbay_arena_pdf import OakBayArenaPDFScraper
 from scrapers.oakbay_aquatics_pdf import OakBayAquaticsPDFScraper
 from scrapers.pearkes_pdf import PearkesPDFScraper
+from scrapers.saanich_commonwealth_swimming_pdf import SaanichCommonwealthSwimmingPDFScraper
 from scrapers.perfectmind import PerfectMindScraper
 from scrapers.perfectmind_sources import PERFECTMIND_SOURCES
 from scrapers.recdesk_calendar import RecDeskCalendarScraper
@@ -248,6 +249,12 @@ def _run_scraper(source_key: str, display_name: str, municipality: str, scraper)
 def iter_scrapers():
     yield ("saanich_active_communities", "Saanich Active Communities", "Saanich", SaanichScraper())
     yield ("saanich_pearkes_pdf", "G. R. Pearkes Recreation Centre PDF", "Saanich", PearkesPDFScraper())
+    yield (
+        "saanich_commonwealth_swimming_pdf",
+        "Saanich Commonwealth Swimming PDF",
+        "Saanich",
+        SaanichCommonwealthSwimmingPDFScraper(),
+    )
 
     for source in PERFECTMIND_SOURCES:
         display_name = source.get("municipality") or source.get("subdomain") or "PerfectMind"
