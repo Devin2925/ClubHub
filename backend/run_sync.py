@@ -216,13 +216,14 @@ def _run_scraper(source_key: str, display_name: str, municipality: str, scraper)
             signal.signal(signal.SIGALRM, _handle_timeout)
             signal.alarm(SCRAPER_TIMEOUT_SECONDS)
         events = scraper.scrape() or []
+        reported_count = getattr(scraper, "last_reported_count", len(events))
         duration_ms = int((perf_counter() - started) * 1000)
         _upsert_source_status(
             source_key,
             display_name,
             municipality,
             status="ok",
-            event_count=len(events),
+            event_count=reported_count,
             duration_ms=duration_ms,
         )
         return events

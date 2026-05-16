@@ -4,6 +4,7 @@ PERFECTMIND_SOURCES = [
         "municipality": "Victoria",
         "widget_id": "15f6af07-39c5-473e-b053-96653f77a406",
         "account_id": "23902",
+        "use_playwright": False,
     },
     {
         "subdomain": "esquimalt",
@@ -18,12 +19,14 @@ PERFECTMIND_SOURCES = [
             "https://esquimalt.perfectmind.com/22948/Clients/BookMe4BookingPages/Classes?calendarId=560126b8-dbc9-4b05-86ee-9e79fb44f1c2&widgetId=15f6af07-39c5-473e-b053-96653f77a406&embed=False",
             "https://esquimalt.perfectmind.com/22948/Clients/BookMe4BookingPages/Classes?calendarId=24cb1ddb-d609-4cfb-9113-90f71eb794ce&widgetId=6e152b61-f816-47b9-9f0e-a8cadcfeb3a8&embed=False",
         ],
+        "use_playwright": False,
     },
     {
         "subdomain": "panoramarec",
         "municipality": "Panorama",
         "widget_id": "88f951c9-8066-4cdd-997f-b009c104589c",
         "account_id": "22938",
+        "use_playwright": False,
     },
     {
         "subdomain": "oakbayrec",

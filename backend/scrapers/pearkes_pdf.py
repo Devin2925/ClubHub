@@ -23,23 +23,23 @@ DAY_TO_INDEX = {
 }
 ROW_CONFIG = {
     "Skate - Everyone Welcome": {
-        "start": "Everyone",
-        "end": "Adult and Child",
+        "start": "Everyone Welcome",
+        "end": "Adult and Child Hockey",
         "days": ["MON", "WED", "FRI", "SAT", "SUN"],
     },
     "Skate - Parent & Child Hockey Social 5-10yrs": {
-        "start": "Adult and Child",
-        "end": "Adult and Tot Ice",
+        "start": "Adult and Child Hockey",
+        "end": "Adult and Tot Ice Play",
         "days": ["MON"],
     },
     "Skate - Adult and Tot Ice Play 1-6yrs": {
-        "start": "Adult and Tot Ice",
-        "end": "Adult Skate",
+        "start": "Adult and Tot Ice Play",
+        "end": "Adult Skate & Adult Figure",
         "days": ["WED", "WED", "FRI", "SAT"],
     },
     "Skate - Adult Skate Drop In 19yrs+": {
-        "start": "Adult Skate",
-        "end": "Adult Figure",
+        "start": "Adult Skate & Adult Figure",
+        "end": "**Stick & Puck",
         "days": ["MON", "TUES", "THURS", "SAT", "SUN"],
     },
     "Skate - Adult Figure Skate Drop In 19yrs+": {
@@ -56,6 +56,7 @@ class PearkesPDFScraper(BaseScraper):
         self.venue_name = "G. R. Pearkes Recreation Centre"
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "Mozilla/5.0"})
+        self.last_reported_count = 0
 
     def _discover_pdf_url(self) -> str:
         response = self.session.get(PAGE_URL, timeout=30)
@@ -108,8 +109,15 @@ class PearkesPDFScraper(BaseScraper):
         return [" ".join(line.split()) for line in text.splitlines() if line.split()]
 
     def _row_lines(self, lines: list[str], start_marker: str, end_marker: str) -> list[str]:
-        start_index = next(i for i, line in enumerate(lines) if line.startswith(start_marker))
-        end_index = next(i for i, line in enumerate(lines[start_index + 1 :], start_index + 1) if line.startswith(end_marker))
+        try:
+            start_index = next(i for i, line in enumerate(lines) if line.startswith(start_marker))
+            end_index = next(
+                i
+                for i, line in enumerate(lines[start_index + 1 :], start_index + 1)
+                if line.startswith(end_marker)
+            )
+        except StopIteration:
+            return []
         return lines[start_index:end_index]
 
     def _time_pattern(self) -> re.Pattern[str]:
@@ -282,6 +290,7 @@ class PearkesPDFScraper(BaseScraper):
         layout_text: str,
         start_date: date,
         end_date: date,
+        reported_event_keys: set[tuple[str, str]],
     ):
         lines = [line.rstrip() for line in layout_text.splitlines()]
         try:
@@ -333,6 +342,7 @@ class PearkesPDFScraper(BaseScraper):
                 if end_dt <= start_dt:
                     end_dt += timedelta(days=1)
                 for title in titles:
+                    reported_event_keys.add((title, start_dt.replace(microsecond=0).isoformat(sep=" ")))
                     self._append_missing_event(
                         events,
                         existing,
@@ -357,9 +367,12 @@ class PearkesPDFScraper(BaseScraper):
 
         existing = self._existing_keys(start_date, end_date)
         events = []
+        reported_event_keys = set()
 
         for title, config in ROW_CONFIG.items():
             row_lines = self._row_lines(lines, config["start"], config["end"])
+            if not row_lines:
+                continue
             tokens = self._time_tokens(row_lines)
             entries = self._group_entries(tokens, config["days"])
             for entry in entries:
@@ -375,6 +388,7 @@ class PearkesPDFScraper(BaseScraper):
                     )
                     if end_dt <= start_dt:
                         end_dt += timedelta(days=1)
+                    reported_event_keys.add((title, start_dt.replace(microsecond=0).isoformat(sep=" ")))
                     self._append_missing_event(
                         events,
                         existing,
@@ -392,8 +406,10 @@ class PearkesPDFScraper(BaseScraper):
             layout_text=layout_text,
             start_date=start_date,
             end_date=end_date,
+            reported_event_keys=reported_event_keys,
         )
 
+        self.last_reported_count = len(reported_event_keys)
         print(f"[{self.municipality}] Pearkes PDF normalized {len(events)} missing events.")
         self.save_events(events)
         return events
