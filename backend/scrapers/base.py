@@ -58,12 +58,7 @@ def classify_sport_fields(title: str, facility_name: str = "", description: str 
     if title_only != "other":
         return title_only
 
-    title_and_description = " ".join(part for part in [title, description] if part)
-    title_desc_type = classify_sport(title_and_description)
-    if title_desc_type != "other":
-        return title_desc_type
-
-    combined = " ".join(part for part in [title, facility_name, description] if part)
+    combined = " ".join(part for part in [title, facility_name] if part)
     return classify_sport(combined)
 
 

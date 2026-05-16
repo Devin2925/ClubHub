@@ -72,7 +72,10 @@ class WSPRScraper(BaseScraper):
         text = strip_html(value)
         text = re.sub(r"\s+", " ", text)
         text = re.sub(r"(Location:|Venue:)", "", text)
-        return text.strip(" -")
+        text = text.strip(" -")
+        if text.lower() == "not specified":
+            return ""
+        return text
 
     def _parse_datetime_range(self, date_str: str, time_str: str) -> tuple[datetime, datetime]:
         start_str, end_str = [part.strip() for part in time_str.split("-", 1)]
@@ -248,13 +251,13 @@ class WSPRScraper(BaseScraper):
             title = strip_html(title_match.group(1)) if title_match else ""
             date_str = strip_html(date_match.group(1)) if date_match else ""
             time_str = strip_html(time_match.group(1)) if time_match else ""
-            location = strip_html(location_match.group(1)) if location_match else ""
+            location = self._clean_location_html(location_match.group(1)) if location_match else ""
             spaces = strip_html(spaces_match.group(1)) if spaces_match else ""
             description = unescape(description_match.group(1)).replace("\r", " ").replace("\n", " ").strip() if description_match else ""
 
             venue = ""
             if venue_match:
-                venue = strip_html(re.sub(r"<a.*?</a>", " ", venue_match.group(1), flags=re.S))
+                venue = self._clean_location_html(re.sub(r"<a.*?</a>", " ", venue_match.group(1), flags=re.S))
 
             normalized = self._normalize_schedule_card(
                 page_url,
@@ -409,11 +412,16 @@ class WSPRScraper(BaseScraper):
                     continue
                 if normalized["venue_name"] == "West Shore":
                     normalized["venue_name"] = "Juan de Fuca Rec Centre"
-                if not normalized["facility_name"]:
+                if (
+                    not normalized["facility_name"]
+                    or normalized["facility_name"].lower() == "not specified"
+                ):
                     normalized["facility_name"] = self._extract_first(
                         grid_response.text,
                         r"<title>(.*?) - Westshore</title>",
                     )
+                if "/drop_pool" in page_url and normalized["facility_name"].lower() == "not specified":
+                    normalized["facility_name"] = "Pool"
                 if normalized["source_id"] in seen_ids:
                     continue
                 seen_ids.add(normalized["source_id"])
@@ -531,6 +539,7 @@ class WSPRScraper(BaseScraper):
 
         all_events = []
         seen_ids = set()
+        seen_keys = set()
 
         for page_url in pages:
             try:
@@ -546,9 +555,17 @@ class WSPRScraper(BaseScraper):
                 continue
 
             for event in page_events:
-                if event["source_id"] in seen_ids:
+                semantic_key = (
+                    event["title"],
+                    event["start_time"],
+                    event["end_time"],
+                    event["venue_name"],
+                    event["facility_name"],
+                )
+                if event["source_id"] in seen_ids or semantic_key in seen_keys:
                     continue
                 seen_ids.add(event["source_id"])
+                seen_keys.add(semantic_key)
                 all_events.append(event)
 
         try:
@@ -558,11 +575,20 @@ class WSPRScraper(BaseScraper):
             outdoor_events = []
 
         for event in outdoor_events:
-            if event["source_id"] in seen_ids:
+            semantic_key = (
+                event["title"],
+                event["start_time"],
+                event["end_time"],
+                event["venue_name"],
+                event["facility_name"],
+            )
+            if event["source_id"] in seen_ids or semantic_key in seen_keys:
                 continue
             seen_ids.add(event["source_id"])
+            seen_keys.add(semantic_key)
             all_events.append(event)
 
         print(f"[{self.municipality}] Normalized {len(all_events)} events.")
+        self.replace_existing_events()
         self.save_events(all_events)
         return all_events
