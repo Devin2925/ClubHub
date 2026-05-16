@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { Metadata } from "next";
-import EventCard from "../../components/EventCard";
+import VenueScheduleClient from "../../components/VenueScheduleClient";
 import { DEMO_MODE, getDemoEvents } from "../../lib/demo";
 import {
   API_BASE,
   EventData,
-  formatFullDate,
-  formatMonthDay,
-  getDateKey,
-  getOfferingMeta,
-  getSportMeta,
   venueSlug,
 } from "../../lib/utils";
 import { getVenueSnapshot, SITE_NAME } from "../../lib/seo";
@@ -66,29 +61,6 @@ export default async function VenueDetailPage({ params }: Props) {
   const events = allEvents.filter((event) => venueSlug(event.venue_name) === resolvedParams.venue);
   const venueName = events[0]?.venue_name || resolvedParams.venue;
   const municipality = events[0]?.municipality || "Greater Victoria";
-
-  const groupedByDate = Object.entries(
-    events.reduce<Record<string, EventData[]>>((groups, event) => {
-      const key = getDateKey(event.start_time);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(event);
-      return groups;
-    }, {})
-  ).sort(([a], [b]) => a.localeCompare(b));
-
-  const sportCounts = Object.entries(
-    events.reduce<Record<string, number>>((counts, event) => {
-      counts[event.sport_type] = (counts[event.sport_type] || 0) + 1;
-      return counts;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]);
-
-  const offeringCounts = Object.entries(
-    events.reduce<Record<string, number>>((counts, event) => {
-      counts[event.offering_type] = (counts[event.offering_type] || 0) + 1;
-      return counts;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]);
   const venueJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsActivityLocation",
@@ -141,87 +113,7 @@ export default async function VenueDetailPage({ params }: Props) {
         <Link href="/venues" className="section-link" style={{ marginTop: "2rem", display: "inline-flex" }}>
           Back to venue list
         </Link>
-
-        <section className="hero" style={{ paddingTop: "3rem" }}>
-          <div className="chip-group-label">{municipality}</div>
-          <h1>
-            What&apos;s on at <strong>{venueName}</strong>
-          </h1>
-          <p className="hero-subtitle">
-            Upcoming drop-ins, classes, swims, skates, and community activities at this venue in {municipality}, BC.
-          </p>
-
-          <div className="status-strip status-strip-wide">
-            <div className="status-card">
-              <div className="status-kicker">Upcoming</div>
-              <div className="status-number">{events.length}</div>
-              <div className="status-copy">Activities at this venue</div>
-            </div>
-            <div className="status-card">
-              <div className="status-kicker">Sports And Types</div>
-              <div className="status-number">{sportCounts.length}</div>
-              <div className="status-copy">Different categories represented</div>
-            </div>
-            <div className="status-card">
-              <div className="status-kicker">Next Date</div>
-              <div className="status-number">
-                {events[0] ? formatMonthDay(events[0].start_time) : "-"}
-              </div>
-              <div className="status-copy">Earliest upcoming session</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="browse-layout browse-layout-tight">
-          <aside className="browse-sidebar">
-            <div className="sidebar-card">
-              <div className="chip-group-label">Sport Mix</div>
-              <div className="sidebar-links">
-                {sportCounts.map(([sport, count]) => (
-                  <div key={sport} className="sidebar-link static">
-                    <span>{getSportMeta(sport).label}</span>
-                    <span>{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="sidebar-card">
-              <div className="chip-group-label">Activity Types</div>
-              <div className="sidebar-links">
-                {offeringCounts.map(([offeringType, count]) => (
-                  <div key={offeringType} className="sidebar-link static">
-                    <span>{getOfferingMeta(offeringType).label}</span>
-                    <span>{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <section className="browse-main">
-            {groupedByDate.length === 0 ? (
-              <div className="empty-state">
-                <span className="empty-state-mark">No Upcoming Activity</span>
-                This venue does not have any future sessions in the current schedule.
-              </div>
-            ) : (
-              groupedByDate.map(([dateKey, dayEvents]) => (
-                <div key={dateKey} className="day-group">
-                  <div className="day-group-header">
-                    <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
-                    <span className="day-count">{dayEvents.length} activities</span>
-                  </div>
-                  <div className="events-list">
-                    {dayEvents.map((event) => (
-                      <EventCard key={event.id} event={event} />
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </section>
-        </section>
+        <VenueScheduleClient events={events} venueName={venueName} municipality={municipality} />
       </div>
     </main>
   );
