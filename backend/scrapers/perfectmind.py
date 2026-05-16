@@ -6,7 +6,7 @@ from urllib.parse import urljoin, unquote
 import requests
 from playwright.async_api import async_playwright
 
-from scrapers.base import BaseScraper, classify_sport, strip_html
+from scrapers.base import BaseScraper, classify_sport_fields, strip_html
 
 class PerfectMindScraper(BaseScraper):
     def __init__(
@@ -18,8 +18,9 @@ class PerfectMindScraper(BaseScraper):
         start_path: str | None = None,
         seed_urls: list[str] | None = None,
         use_playwright: bool = True,
+        source_id_prefix: str | None = None,
     ):
-        super().__init__(source_id_prefix=f"pm_{subdomain}", municipality=municipality)
+        super().__init__(source_id_prefix=source_id_prefix or f"pm_{subdomain}", municipality=municipality)
         self.subdomain = subdomain
         self.base_url = f"https://{subdomain}.perfectmind.com"
         self.widget_id = widget_id
@@ -181,7 +182,8 @@ class PerfectMindScraper(BaseScraper):
         return links
 
     async def _async_scrape(self):
-        print(f"[{self.municipality}] Starting Playwright scrape...")
+        mode = "Playwright-assisted" if self.use_playwright else "direct PerfectMind"
+        print(f"[{self.municipality}] Starting {mode} scrape...")
         all_events_raw = []
         categories = set(self.seed_urls)
         categories.update(self._extract_category_links())
@@ -259,17 +261,26 @@ class PerfectMindScraper(BaseScraper):
         raw_events = asyncio.run(self._async_scrape())
         
         normalized_events = []
-        seen_ids = set()
+        seen_occurrences = set()
         
         for e in raw_events:
             ev_id = e.get("EventId")
-            if not ev_id or ev_id in seen_ids:
+            occurrence_date = e.get("OccurrenceDate", "")
+            formatted_time = e.get("FormattedStartTime", "")
+            facility_name = e.get("Facility", "")
+            occurrence_key = (
+                ev_id,
+                occurrence_date,
+                formatted_time,
+                facility_name,
+            )
+            if not ev_id or occurrence_key in seen_occurrences:
                 continue
-            seen_ids.add(ev_id)
+            seen_occurrences.add(occurrence_key)
             
             try:
-                time_str = e.get("FormattedStartTime", "")
-                occ_date = e.get("OccurrenceDate")
+                time_str = formatted_time
+                occ_date = occurrence_date
                 if occ_date and len(occ_date) == 8:
                     y, m, d = int(occ_date[:4]), int(occ_date[4:6]), int(occ_date[6:8])
                     t_obj = datetime.strptime(time_str, "%I:%M %p").time()
@@ -282,23 +293,33 @@ class PerfectMindScraper(BaseScraper):
             except Exception:
                 start_time = datetime.utcnow()
                 end_time = datetime.utcnow()
-                
+            
             title = e.get("EventName", "Unknown")
+            description = strip_html(e.get("Details", ""))
+            source_id_suffix = "__".join(
+                [
+                    ev_id,
+                    occurrence_date or "undated",
+                    (formatted_time or "unknown").replace(" ", "").replace(":", "").lower(),
+                    re.sub(r"[^a-z0-9]+", "-", facility_name.lower()).strip("-") or "facility",
+                ]
+            )
                 
             normalized = {
-                "source_id": f"{self.source_id_prefix}_{ev_id}",
+                "source_id": f"{self.source_id_prefix}_{source_id_suffix}",
                 "title": title,
-                "sport_type": classify_sport(title),
+                "sport_type": classify_sport_fields(title, facility_name, description),
                 "venue_name": e.get("Location", self.municipality),
-                "facility_name": e.get("Facility", ""),
+                "facility_name": facility_name,
                 "start_time": start_time,
                 "end_time": end_time,
                 "price": e.get("PriceRange", ""),
-                "description": strip_html(e.get("Details", "")),
+                "description": description,
                 "booking_url": self.start_url
             }
             normalized_events.append(normalized)
 
         print(f"[{self.municipality}] Normalized {len(normalized_events)} events.")
+        self.replace_existing_events()
         self.save_events(normalized_events)
         return normalized_events

@@ -265,6 +265,21 @@ def iter_scrapers():
             PerfectMindScraper(**source),
         )
 
+    yield (
+        "perfectmind_panorama_aquatics",
+        "Panorama Aquatics",
+        "Panorama",
+        PerfectMindScraper(
+            subdomain="panoramarec",
+            municipality="Panorama",
+            widget_id="aed3e120-132f-424d-a0ed-d2b0298012fc",
+            account_id="22938",
+            start_path="/22938/Activities/BookMe4?widgetId=aed3e120-132f-424d-a0ed-d2b0298012fc&embed=true",
+            use_playwright=False,
+            source_id_prefix="pm_panoramarec_aquatics",
+        ),
+    )
+
     yield ("oakbay_henderson_pdf", "Henderson Recreation Centre PDF", "Oak Bay", OakBayPDFScraper())
     yield ("oakbay_fitness_hours", "Oak Bay Fitness Hours", "Oak Bay", OakBayFitnessScraper())
     yield ("oakbay_aquatics_pdf", "Oak Bay Aquatics PDF", "Oak Bay", OakBayAquaticsPDFScraper())

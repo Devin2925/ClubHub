@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from sqlalchemy import delete
 from models import SessionLocal, Event
 
 # ─── Common Sport Classification ──────────────────────────────────
@@ -50,6 +51,20 @@ def classify_sport(title: str) -> str:
         if re.search(pattern, title_lower):
             return sport
     return "other"
+
+
+def classify_sport_fields(title: str, facility_name: str = "", description: str = "") -> str:
+    title_only = classify_sport(title)
+    if title_only != "other":
+        return title_only
+
+    title_and_description = " ".join(part for part in [title, description] if part)
+    title_desc_type = classify_sport(title_and_description)
+    if title_desc_type != "other":
+        return title_desc_type
+
+    combined = " ".join(part for part in [title, facility_name, description] if part)
+    return classify_sport(combined)
 
 
 PICKUP_PATTERNS = [
@@ -186,6 +201,22 @@ class BaseScraper:
         """Must be implemented by subclasses. Returns list of event dicts."""
         raise NotImplementedError
 
+    def replace_existing_events(self):
+        """Replace all events owned by this scraper source before saving a fresh run."""
+        db = SessionLocal()
+        try:
+            deleted = db.execute(
+                delete(Event).where(Event.source == self.source_id_prefix)
+            ).rowcount or 0
+            db.commit()
+            print(f"[{self.municipality}] Replaced {deleted} existing events for {self.source_id_prefix}")
+        except Exception as exc:
+            db.rollback()
+            print(f"[{self.municipality}] Replace error: {exc}")
+            raise
+        finally:
+            db.close()
+
     def save_events(self, events: list):
         """Upsert events into the database."""
         db = SessionLocal()
@@ -196,7 +227,11 @@ class BaseScraper:
                 # Ensure source and municipality are set
                 ev_data.setdefault("source", self.source_id_prefix)
                 ev_data.setdefault("municipality", self.municipality)
-                ev_data["sport_type"] = classify_sport(ev_data.get("title", ""))
+                ev_data["sport_type"] = classify_sport_fields(
+                    ev_data.get("title", ""),
+                    ev_data.get("facility_name", "") or "",
+                    ev_data.get("description", "") or "",
+                )
                 ev_data["offering_type"] = classify_offering_type(
                     ev_data.get("title", ""),
                     ev_data.get("description", "") or "",

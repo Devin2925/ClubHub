@@ -103,12 +103,19 @@ class WSPRScraper(BaseScraper):
         raw_key = "|".join([title, date_str, time_str, venue, location])
         source_hash = hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:16]
 
+        normalized_venue = venue or "West Shore"
+        normalized_facility = location
+        if "/drop_pool" in page_url:
+            normalized_venue = "Juan de Fuca Rec Centre"
+            if not normalized_facility:
+                normalized_facility = "Pool"
+
         return {
             "source_id": f"{self.source_id_prefix}_{source_hash}",
             "title": title,
             "sport_type": classify_sport(title),
-            "venue_name": venue or "West Shore",
-            "facility_name": location,
+            "venue_name": normalized_venue,
+            "facility_name": normalized_facility,
             "start_time": start_time,
             "end_time": end_time,
             "price": "",
@@ -189,6 +196,11 @@ class WSPRScraper(BaseScraper):
             return None
 
         venue_name = venue or "Juan de Fuca Rec Centre"
+        facility_name = location
+        if "/drop_pool" in page_url:
+            venue_name = "Juan de Fuca Rec Centre"
+            if not facility_name:
+                facility_name = "Pool"
         raw_key = "|".join([title, date_str, cleaned_time, venue_name, location])
         source_hash = hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:16]
 
@@ -201,7 +213,7 @@ class WSPRScraper(BaseScraper):
             "title": title,
             "sport_type": classify_sport(title),
             "venue_name": venue_name,
-            "facility_name": location,
+            "facility_name": facility_name,
             "start_time": start_time,
             "end_time": end_time,
             "price": "",
