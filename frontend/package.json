@@ -1,0 +1,36 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "lucide-react": "^1.7.0",
+    "next": "16.2.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "optionalDependencies": {
+    "@next/swc-darwin-arm64": "16.2.3",
+    "@next/swc-darwin-x64": "16.2.3",
+    "@next/swc-linux-arm64-gnu": "16.2.3",
+    "@next/swc-linux-arm64-musl": "16.2.3",
+    "@next/swc-linux-x64-gnu": "16.2.3",
+    "@next/swc-linux-x64-musl": "16.2.3",
+    "@next/swc-win32-arm64-msvc": "16.2.3",
+    "@next/swc-win32-x64-msvc": "16.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "typescript": "^5"
+  }
+}

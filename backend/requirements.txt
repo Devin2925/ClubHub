@@ -1,0 +1,6 @@
+flask
+flask-cors
+requests
+sqlalchemy
+apscheduler
+pypdf
