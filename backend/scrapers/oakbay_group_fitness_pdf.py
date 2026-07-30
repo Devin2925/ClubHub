@@ -58,18 +58,23 @@ class OakBayGroupFitnessPDFScraper(BaseScraper):
         ).date()
         return start_date, end_date
 
-    def _day_boundaries(self, header_line: str) -> list[int]:
-        positions = [header_line.index(day) for day in DAY_NAMES]
+    def _day_boundaries(self, header_line: str, max_width: int = 0) -> list[int]:
+        # Split on the midpoint between column centres. Splitting on the midpoint
+        # between the header word starts drifts right of the real column edge and
+        # slices characters off the neighbouring cell.
+        centres = [header_line.index(day) + len(day) / 2 for day in DAY_NAMES]
         boundaries = [0]
-        for idx in range(len(positions) - 1):
-            boundaries.append((positions[idx] + positions[idx + 1]) // 2)
-        boundaries.append(len(header_line))
+        for idx in range(len(centres) - 1):
+            boundaries.append(int((centres[idx] + centres[idx + 1]) // 2))
+        boundaries.append(max(max_width, len(header_line)) + 1)
         return boundaries
 
     def _extract_sections(self, layout_text: str) -> dict[str, dict[str, list[str]]]:
         lines = layout_text.splitlines()
         header_index = next(i for i, line in enumerate(lines) if "Monday" in line and "Sunday" in line)
-        boundaries = self._day_boundaries(lines[header_index])
+        boundaries = self._day_boundaries(
+            lines[header_index], max(len(line) for line in lines)
+        )
 
         sections = {
             venue_name: {day: [] for day in DAY_NAMES}

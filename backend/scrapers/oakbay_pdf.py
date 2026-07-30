@@ -11,6 +11,15 @@ from scrapers.base import BaseScraper, classify_sport
 
 DROPIN_PAGE_URL = "https://www.oakbay.ca/parks-recreation/programs-registration-services/drop-in-schedules/"
 TARGET_SPORTS = {"pickleball", "badminton", "table-tennis", "squash"}
+TIME_RANGE_RE = re.compile(
+    r"(\d{1,2}:\d{2})\s*(am|pm)?\s*-\s*(\d{1,2}:\d{2})\s*(am|pm)",
+    re.I,
+)
+MONTH_TOKEN = r"Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
+DATE_WINDOW_RE = re.compile(
+    rf"({MONTH_TOKEN})[a-z]*\.?\s+(\d{{1,2}})\s*[-–]\s*(?:({MONTH_TOKEN})[a-z]*\.?\s+)?(\d{{1,2}})",
+    re.I,
+)
 DAY_TO_INDEX = {
     "Monday": 0,
     "Tuesday": 1,
@@ -48,11 +57,15 @@ class OakBayPDFScraper(BaseScraper):
         header_line = lines[header_index]
 
         days = list(DAY_TO_INDEX.keys())
-        positions = [header_line.index(day) for day in days]
+        # Split on the midpoint between column centres. Splitting on the midpoint
+        # between the header word starts drifts right of the real column edge and
+        # slices a character off the neighbouring cell.
+        centres = [header_line.index(day) + len(day) / 2 for day in days]
         boundaries = [0]
-        for idx in range(len(positions) - 1):
-            boundaries.append((positions[idx] + positions[idx + 1]) // 2)
-        boundaries.append(len(header_line))
+        for idx in range(len(centres) - 1):
+            boundaries.append(int((centres[idx] + centres[idx + 1]) // 2))
+        # Content lines can run past the header, so let the last column absorb the rest.
+        boundaries.append(max(len(line) for line in lines) + 1)
 
         columns = {day: [] for day in days}
         for line in lines[header_index + 1 :]:
@@ -61,15 +74,35 @@ class OakBayPDFScraper(BaseScraper):
             for idx, day in enumerate(days):
                 start = boundaries[idx]
                 end = boundaries[idx + 1]
-                segment = line[start:end].strip()
-                if segment:
-                    columns[day].append(segment)
+                # Keep blank segments: a vertical gap in a column ends that cell,
+                # and dropping them lets one cell's text run into the next one.
+                columns[day].append(line[start:end].strip())
 
-        return columns
+        return {day: self._join_split_times(segments) for day, segments in columns.items()}
+
+    def _join_split_times(self, segments: list[str]) -> list[str]:
+        """Rejoin a time range that the PDF wrapped across two lines ("11:15am-" / "12:15pm")."""
+        joined: list[str] = []
+        index = 0
+        while index < len(segments):
+            current = segments[index]
+            if (
+                re.search(r"\d{1,2}:\d{2}\s*(?:am|pm)?\s*-$", current, re.I)
+                and index + 1 < len(segments)
+                and re.match(r"^\d{1,2}:\d{2}\s*(?:am|pm)", segments[index + 1], re.I)
+            ):
+                joined.append(f"{current} {segments[index + 1]}")
+                index += 2
+                continue
+            joined.append(current)
+            index += 1
+        return joined
+
+    def _time_match(self, line: str):
+        return TIME_RANGE_RE.search(line.replace("*", ""))
 
     def _is_time_line(self, line: str) -> bool:
-        compact = line.replace(" ", "")
-        return bool(re.search(r"\d{1,2}:\d{2}(am|pm)?-\d{1,2}:\d{2}(am|pm)\*?", compact, re.I))
+        return self._time_match(line) is not None
 
     def _is_note_line(self, line: str) -> bool:
         compact = " ".join(line.split())
@@ -79,23 +112,36 @@ class OakBayPDFScraper(BaseScraper):
             or "May & June" in compact
             or "Ends June" in compact
             or "Friday, May 1" in compact
+            or bool(DATE_WINDOW_RE.fullmatch(compact))
         )
 
+    def _parse_date_window(self, note: str, year: int) -> tuple[date, date] | None:
+        """Read a 'Aug 9-Sept 6' style run-window off a cell note."""
+        match = DATE_WINDOW_RE.search(note)
+        if not match:
+            return None
+        start_month, start_day, end_month, end_day = match.groups()
+        try:
+            start = datetime.strptime(f"{start_month[:3]} {start_day} {year}", "%b %d %Y").date()
+            end = datetime.strptime(
+                f"{(end_month or start_month)[:3]} {end_day} {year}", "%b %d %Y"
+            ).date()
+        except ValueError:
+            return None
+        if end < start:
+            end = end.replace(year=end.year + 1)
+        return start, end
+
     def _parse_time_range(self, raw: str) -> tuple[str, str]:
-        compact = raw.replace(" ", "").replace("*", "").lower()
-        start_raw, end_raw = compact.split("-", 1)
+        # Pull the range out of the cell rather than assuming the cell is only a
+        # time, so a stray character from an adjacent column cannot break the row.
+        match = self._time_match(raw)
+        if not match:
+            raise ValueError(f"Unparseable time range: {raw}")
 
-        end_match = re.match(r"(\d{1,2}:\d{2})(am|pm)", end_raw)
-        if not end_match:
-            raise ValueError(f"Unparseable end time: {raw}")
-        end_clock, end_meridiem = end_match.groups()
-
-        start_match = re.match(r"(\d{1,2}:\d{2})(am|pm)?", start_raw)
-        if not start_match:
-            raise ValueError(f"Unparseable start time: {raw}")
-        start_clock, start_meridiem = start_match.groups()
-        if not start_meridiem:
-            start_meridiem = end_meridiem
+        start_clock, start_meridiem, end_clock, end_meridiem = match.groups()
+        end_meridiem = end_meridiem.lower()
+        start_meridiem = (start_meridiem or end_meridiem).lower()
 
         return f"{start_clock}{start_meridiem}", f"{end_clock}{end_meridiem}"
 
@@ -106,6 +152,9 @@ class OakBayPDFScraper(BaseScraper):
         for raw_line in lines:
             line = " ".join(raw_line.split())
             if not line:
+                # A gap closes the current cell, so partial text above it never
+                # gets glued onto the next activity's title.
+                title_lines = []
                 continue
 
             if self._is_note_line(line):
@@ -145,6 +194,10 @@ class OakBayPDFScraper(BaseScraper):
         return True
 
     def _apply_note_rules(self, occurrence_date: date, note: str, raw_time: str) -> bool:
+        window = self._parse_date_window(note, occurrence_date.year)
+        if window and not (window[0] <= occurrence_date <= window[1]):
+            return False
+
         note = note.lower()
         if "may & june" in note and occurrence_date.month < 5:
             return False
@@ -178,14 +231,23 @@ class OakBayPDFScraper(BaseScraper):
                     if not self._apply_note_rules(current, event["note"], event["raw_time"]):
                         continue
 
-                    start_dt = datetime.strptime(
-                        f"{current.isoformat()} {event['start_time_str']}",
-                        "%Y-%m-%d %I:%M%p",
-                    )
-                    end_dt = datetime.strptime(
-                        f"{current.isoformat()} {event['end_time_str']}",
-                        "%Y-%m-%d %I:%M%p",
-                    )
+                    try:
+                        start_dt = datetime.strptime(
+                            f"{current.isoformat()} {event['start_time_str']}",
+                            "%Y-%m-%d %I:%M%p",
+                        )
+                        end_dt = datetime.strptime(
+                            f"{current.isoformat()} {event['end_time_str']}",
+                            "%Y-%m-%d %I:%M%p",
+                        )
+                    except ValueError:
+                        # The published PDF carries the occasional impossible clock
+                        # time (e.g. 6:60pm); drop that row instead of the whole run.
+                        print(
+                            f"[{self.municipality}] Skipping invalid Oak Bay time "
+                            f"'{event['raw_time'].strip()}' for {event['title']}"
+                        )
+                        continue
                     if end_dt <= start_dt:
                         end_dt += timedelta(days=1)
 
