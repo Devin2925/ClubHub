@@ -1,11 +1,20 @@
 import hashlib
 import html
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 
 from scrapers.base import BaseScraper
+
+# The centre writes months freehand, so "Sept" turns up alongside "September"
+# and "Sep". Anything strptime does not accept gets mapped to a form it does.
+MONTH_ALIASES = {
+    "sept": "sep",
+    "sepetember": "september",
+    "tues": "tue",
+    "thurs": "thu",
+}
 
 
 class JamesBayEventsScraper(BaseScraper):
@@ -36,6 +45,22 @@ class JamesBayEventsScraper(BaseScraper):
                 return datetime.strptime(value, fmt)
             except ValueError:
                 continue
+        return None
+
+    def _parse_month_day(self, month_name: str, day_str: str) -> date | None:
+        """Resolve a freehand "Sept 15" style date to the next occurrence of that day."""
+        token = month_name.strip().rstrip(".").lower()
+        token = MONTH_ALIASES.get(token, token)
+        today = date.today()
+        for fmt in ("%B %d %Y", "%b %d %Y"):
+            try:
+                parsed = datetime.strptime(f"{token} {day_str} {today.year}", fmt).date()
+            except ValueError:
+                continue
+            # A menu published in December for January carries no year of its own.
+            if (today - parsed).days > 180:
+                parsed = parsed.replace(year=parsed.year + 1)
+            return parsed
         return None
 
     def _fetch_wp_page(self, slug: str) -> dict | None:
@@ -154,10 +179,14 @@ class JamesBayEventsScraper(BaseScraper):
 
             for match in pattern.finditer(text):
                 weekday, month_name, day_str, meal_type, time_text, meal_name = match.groups()
-                event_date = datetime.strptime(
-                    f"{month_name} {day_str} {datetime.utcnow().year}",
-                    "%B %d %Y",
-                ).date()
+                event_date = self._parse_month_day(month_name, day_str)
+                if not event_date:
+                    # One unreadable menu date should not cost us the whole centre.
+                    print(
+                        f"[{self.municipality}] Skipping unreadable James Bay meal date "
+                        f"'{month_name} {day_str}'"
+                    )
+                    continue
                 time_range = self._parse_meal_time(time_text)
                 if not time_range:
                     continue
