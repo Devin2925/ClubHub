@@ -51,6 +51,7 @@ def _upsert_source_status(
     event_count: int = 0,
     duration_ms: int = 0,
     error: str | None = None,
+    note: str | None = None,
 ):
     db = SessionLocal()
     try:
@@ -79,7 +80,7 @@ def _upsert_source_status(
             row.last_event_count = event_count
             row.last_event_delta = event_count - (row.previous_event_count or 0)
             row.last_duration_ms = duration_ms
-            row.last_error = None
+            row.last_error = note
         elif status == "error":
             row.status = "error"
             row.last_failed_at = now
@@ -147,7 +148,10 @@ def _backup_database():
         ]
     )
     for stale_path in backups[:-BACKUP_RETENTION]:
-        os.remove(stale_path)
+        try:
+            os.remove(stale_path)
+        except FileNotFoundError:
+            pass
 
     print(f"[DB] Backup created: {backup_path}")
 
@@ -171,10 +175,14 @@ def _sync_venue_statuses():
         for entry in VENUE_REGISTRY
         if entry.get("automation_ready")
     ]
+    tracked_keys = {f"{municipality}::{venue_name}" for municipality, venue_name in tracked_venues}
 
     db = SessionLocal()
     try:
         now = utcnow()
+        for row in db.query(VenueSyncStatus).all():
+            if row.venue_key not in tracked_keys:
+                db.delete(row)
         for municipality, venue_name in tracked_venues:
             venue_key = f"{municipality}::{venue_name}"
             row = db.query(VenueSyncStatus).filter_by(venue_key=venue_key).first()
@@ -218,6 +226,7 @@ def _run_scraper(source_key: str, display_name: str, municipality: str, scraper)
             signal.alarm(SCRAPER_TIMEOUT_SECONDS)
         events = scraper.scrape() or []
         reported_count = getattr(scraper, "last_reported_count", len(events))
+        status_note = getattr(scraper, "last_status_note", None)
         duration_ms = int((perf_counter() - started) * 1000)
         _upsert_source_status(
             source_key,
@@ -226,6 +235,7 @@ def _run_scraper(source_key: str, display_name: str, municipality: str, scraper)
             status="ok",
             event_count=reported_count,
             duration_ms=duration_ms,
+            note=status_note,
         )
         return events
     except Exception as exc:

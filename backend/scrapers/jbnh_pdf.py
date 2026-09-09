@@ -156,6 +156,17 @@ class JBNHPDFScraper(BaseScraper):
             layout_pages = self._read_layout_pages(pdf_url)
             month, year = self._parse_month_year(layout_pages[0])
             lines_by_date = self._collect_lines_by_date(layout_pages, month, year)
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status == 404:
+                self.last_status_note = f"publisher_page_unavailable: {PAGE_URL} returned 404"
+                print(
+                    f"[{self.municipality}] James Bay New Horizons skipped: "
+                    f"publisher page returned 404."
+                )
+                return []
+            print(f"[{self.municipality}] James Bay New Horizons scrape failed: {exc}")
+            return []
         except Exception as exc:
             print(f"[{self.municipality}] James Bay New Horizons scrape failed: {exc}")
             return []

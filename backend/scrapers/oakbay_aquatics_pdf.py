@@ -19,6 +19,7 @@ DAY_TO_INDEX = {
     "Saturday": 5,
     "Sunday": 6,
 }
+MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
 ROW_CONFIGS = [
     {"title": "Early Bird Swim", "weekday": day, "time": "6:00-9:00am"} for day in DAY_TO_INDEX
 ] + [
@@ -98,7 +99,11 @@ class OakBayAquaticsPDFScraper(BaseScraper):
         return reader.pages[0].extract_text() or ""
 
     def _parse_window(self, text: str) -> tuple[date, date]:
-        match = re.search(r"\((March|April|May|June)\s+(\d{1,2})\s*[–-]\s*(June|July|August|May)\s+(\d{1,2}),\s*(\d{4})\)", text)
+        match = re.search(
+            rf"\(({MONTHS})\s+(\d{{1,2}})(?:st|nd|rd|th)?\s*[–-]\s*"
+            rf"({MONTHS})\s+(\d{{1,2}})(?:st|nd|rd|th)?,\s*(\d{{4}})\)",
+            text,
+        )
         if not match:
             raise ValueError("Could not parse Oak Bay aquatics date window")
         start_month, start_day, end_month, end_day, year = match.groups()

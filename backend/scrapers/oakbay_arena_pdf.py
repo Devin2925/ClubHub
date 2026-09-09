@@ -19,27 +19,152 @@ DAY_TO_INDEX = {
     "Saturday": 5,
     "Sunday": 6,
 }
+MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
+MONTH_ALIASES = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
 ROW_CONFIGS = [
     {
-        "title": "Adult Skate",
+        "output_title": "Over 40 Duffer Hockey",
+        "weekday": "Monday",
+        "time": "8:30-10:15am",
+        "starts_on": "Sept 14",
+        "ends_on": "June 14",
+    },
+    {
+        "output_title": "Over 60 Duffer Hockey",
+        "weekday": "Monday",
+        "time": "10:30-11:45am",
+        "starts_on": "Sept 14",
+        "ends_on": "June 14",
+    },
+    {
+        "output_title": "Over 50 Duffer Hockey",
+        "weekday": "Tuesday",
+        "time": "8:30-9:45am",
+        "starts_on": "Sept 15",
+        "ends_on": "June 15",
+    },
+    {
         "output_title": "Adult Skate",
         "weekday": "Tuesday",
         "time": "10:00-11:30am",
-        "end_note": "(ends -May 12)",
+        "starts_on": "Sept 15",
+        "ends_on": "May 11",
     },
     {
-        "title": "Adult Skate",
+        "output_title": "Over 18 Duffer Hockey",
+        "weekday": "Tuesday",
+        "time": "11:45am-1:15pm",
+        "starts_on": "Sept 15",
+        "ends_on": "June 15",
+    },
+    {
+        "output_title": "Low Cost Everyone Welcome",
+        "weekday": "Tuesday",
+        "time": "6:30-7:45pm",
+        "starts_on": "Oct 6",
+        "ends_on": "March 23",
+    },
+    {
+        "output_title": "Over 40 Duffer Hockey",
+        "weekday": "Wednesday",
+        "time": "8:30-10:15am",
+        "starts_on": "Sept 16",
+        "ends_on": "June 16",
+    },
+    {
         "output_title": "Adult Skate",
         "weekday": "Thursday",
         "time": "10:00-11:30am",
-        "end_note": "(ends -May 14)",
+        "starts_on": "Sept 17",
+        "ends_on": "May 13",
     },
     {
-        "title": "Everyone Welcome",
+        "output_title": "Over 50 Duffer Hockey",
+        "weekday": "Thursday",
+        "time": "8:30-9:45am",
+        "starts_on": "Sept 17",
+        "ends_on": "June 17",
+    },
+    {
+        "output_title": "Over 18 Duffer Hockey",
+        "weekday": "Thursday",
+        "time": "11:45am-1:15pm",
+        "starts_on": "Sept 17",
+        "ends_on": "June 17",
+    },
+    {
+        "output_title": "Everyone Welcome and Stick & Puck",
+        "weekday": "Friday",
+        "time": "8:15-9:30pm",
+        "starts_on": "Oct 2",
+        "ends_on": "March 19",
+    },
+    {
+        "output_title": "Over 40 Duffer Hockey",
+        "weekday": "Friday",
+        "time": "8:30-10:15am",
+        "starts_on": "Sept 18",
+        "ends_on": "June 18",
+    },
+    {
+        "output_title": "Over 60 Duffer Hockey",
+        "weekday": "Friday",
+        "time": "11:45am-1:15pm",
+        "starts_on": "Sept 18",
+        "ends_on": "June 18",
+    },
+    {
         "output_title": "Everyone Welcome",
         "weekday": "Saturday",
         "time": "3:00-4:15pm",
-        "end_note": "(ends -Aug 23)",
+        "starts_on": "Sept 13",
+        "ends_on": "Aug 22",
+    },
+    {
+        "output_title": "Everyone Welcome",
+        "weekday": "Saturday",
+        "time": "7:45-9:00pm",
+        "starts_on": "Oct 3",
+        "ends_on": "March 20",
+    },
+    {
+        "output_title": "Family Skate",
+        "weekday": "Sunday",
+        "time": "1:30-2:45pm",
+        "starts_on": "Oct 4",
+        "ends_on": "March 21",
+    },
+    {
+        "output_title": "Parent & Child Hockey",
+        "weekday": "Sunday",
+        "time": "4:30-5:30pm",
+        "starts_on": "Oct 4",
+        "ends_on": "March 21",
     },
 ]
 
@@ -66,25 +191,33 @@ class OakBayArenaPDFScraper(BaseScraper):
         return reader.pages[0].extract_text() or ""
 
     def _parse_window(self, text: str) -> tuple[date, date]:
-        match = re.search(r"\((March|April|May|June)\s+(\d{1,2})\s*-\s*(June|July|August|May)\s+(\d{1,2}),\s*(\d{4})\)", text)
+        match = re.search(
+            rf"\(({MONTHS})\s+(\d{{1,2}})(?:st|nd|rd|th)?\s*[-–]\s*"
+            rf"({MONTHS})\s+(\d{{1,2}})(?:st|nd|rd|th)?,\s*(\d{{4}})\)",
+            text,
+        )
         if not match:
             raise ValueError("Could not parse Oak Bay arena date window")
         start_month, start_day, end_month, end_day, year = match.groups()
-        start = datetime.strptime(f"{start_month} {start_day} {year}", "%B %d %Y").date()
+        start_year = int(year)
+        start = datetime.strptime(f"{start_month} {start_day} {start_year}", "%B %d %Y").date()
         end = datetime.strptime(f"{end_month} {end_day} {year}", "%B %d %Y").date()
+        if end < start:
+            start = start.replace(year=start.year - 1)
         return start, end
 
-    def _parse_end_date(self, note: str, year: int) -> date:
-        match = re.search(r"ends\s*-?([A-Za-z]+)\s+(\d{1,2})", note, re.I)
+    def _parse_month_day(self, value: str, base_year: int, window_start: date) -> date:
+        match = re.search(r"([A-Za-z]+)\s+(\d{1,2})", value, re.I)
         if not match:
-            raise ValueError(f"Could not parse Oak Bay arena end date: {note}")
+            raise ValueError(f"Could not parse Oak Bay arena date: {value}")
         month_name, day = match.groups()
-        for fmt in ("%B %d %Y", "%b %d %Y"):
-            try:
-                return datetime.strptime(f"{month_name} {day} {year}", fmt).date()
-            except ValueError:
-                continue
-        raise ValueError(f"Could not parse Oak Bay arena end date: {note}")
+        month = MONTH_ALIASES.get(month_name.lower())
+        if not month:
+            raise ValueError(f"Could not parse Oak Bay arena date: {value}")
+        parsed = date(base_year, month, int(day))
+        if parsed < window_start:
+            parsed = parsed.replace(year=parsed.year + 1)
+        return parsed
 
     def _parse_time_range(self, raw: str) -> tuple[str, str]:
         compact = raw.replace(" ", "").lower()
@@ -122,8 +255,7 @@ class OakBayArenaPDFScraper(BaseScraper):
         try:
             pdf_url = self._discover_pdf_url()
             text = self._fetch_text(pdf_url)
-            window_start, _ = self._parse_window(text)
-            year = window_start.year
+            window_start, window_end = self._parse_window(text)
         except Exception as exc:
             print(f"[{self.municipality}] Oak Bay arena PDF scrape failed: {exc}")
             return []
@@ -131,8 +263,12 @@ class OakBayArenaPDFScraper(BaseScraper):
         today = datetime.utcnow().date() - timedelta(days=1)
         events = []
         for row in ROW_CONFIGS:
-            end_date = self._parse_end_date(row["end_note"], year)
-            effective_start = max(window_start, today)
+            start_date = self._parse_month_day(row["starts_on"], window_start.year, window_start)
+            end_date = min(
+                self._parse_month_day(row["ends_on"], window_start.year, window_start),
+                window_end,
+            )
+            effective_start = max(window_start, today, start_date)
             for start_dt, end_dt in self._build_occurrences(
                 row["weekday"],
                 effective_start,

@@ -21,26 +21,52 @@ DAY_TO_INDEX = {
     "SAT": 5,
     "SUN": 6,
 }
+MONTH_ALIASES = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
 ROW_CONFIG = {
     "Skate - Everyone Welcome": {
         "start": "Everyone Welcome",
         "end": "Adult and Child Hockey",
-        "days": ["MON", "WED", "FRI", "SAT", "SUN"],
+        "days": ["WED", "FRI", "SAT", "SUN"],
     },
     "Skate - Parent & Child Hockey Social 5-10yrs": {
-        "start": "Adult and Child Hockey",
-        "end": "Adult and Tot Ice Play",
+        "start": "Adult and Child Hockey Social",
+        "end": "Theme Skates",
         "days": ["MON"],
     },
     "Skate - Adult and Tot Ice Play 1-6yrs": {
-        "start": "Adult and Tot Ice Play",
-        "end": "Adult Skate & Adult Figure",
-        "days": ["WED", "WED", "FRI", "SAT"],
+        "start": "Adult and Tot",
+        "end": "Adult Skate 19yrs+",
+        "days": ["WED", "THURS", "FRI"],
     },
     "Skate - Adult Skate Drop In 19yrs+": {
-        "start": "Adult Skate & Adult Figure",
-        "end": "**Stick & Puck",
-        "days": ["MON", "TUES", "THURS", "SAT", "SUN"],
+        "start": "Adult Skate 19yrs+",
+        "end": "Adult Figure Skate 19yrs+",
+        "days": ["TUES", "THURS", "SUN"],
     },
     "Skate - Adult Figure Skate Drop In 19yrs+": {
         "start": "Adult Figure",
@@ -63,27 +89,30 @@ class PearkesPDFScraper(BaseScraper):
         response.raise_for_status()
         links = re.findall(r'href="([^"]+\.pdf)"', response.text, re.I)
         candidates = []
-        month_name = datetime.utcnow().strftime("%B").lower()
-        month_abbr = datetime.utcnow().strftime("%b").lower()
         for link in links:
             absolute = urljoin(PAGE_URL, link)
             lowered = absolute.lower()
             if "dropin" not in lowered and "dropinskating" not in lowered:
                 continue
-            if "prks_" not in lowered:
+            if "prks_" not in lowered and "pks" not in lowered:
                 continue
+            try:
+                text = self._fetch_text(absolute)
+                start_date, end_date = self._parse_month_window(text)
+            except Exception:
+                start_date = end_date = date.min
             score = 0
-            if "updateddropin" in lowered:
-                score += 3
-            if month_name in lowered or month_abbr in lowered:
-                score += 2
-            candidates.append((score, absolute))
+            if end_date >= date.today():
+                score += 100
+            if "updated" in lowered:
+                score += 10
+            candidates.append((score, end_date, start_date, absolute))
 
         if not candidates:
             raise ValueError("Could not find Pearkes skating PDF")
 
-        candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return candidates[0][1]
+        candidates.sort(key=lambda item: (item[0], item[1], item[2], item[3]), reverse=True)
+        return candidates[0][3]
 
     def _fetch_text(self, pdf_url: str) -> str:
         response = self.session.get(pdf_url, timeout=30)
@@ -98,12 +127,20 @@ class PearkesPDFScraper(BaseScraper):
         return reader.pages[0].extract_text(extraction_mode="layout") or ""
 
     def _parse_month_window(self, text: str) -> tuple[date, date]:
-        match = re.search(r"([A-Z][a-z]+)\s+(\d{1,2})-(\d{1,2}),\s+(\d{4})", text)
+        match = re.search(
+            r"([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*(?:([A-Z][a-z]+)\s+)?(\d{1,2}),\s+(\d{4})",
+            text,
+        )
         if not match:
             raise ValueError("Could not parse Pearkes PDF month window")
-        month_name, start_day, end_day, year = match.groups()
-        month = datetime.strptime(month_name, "%B").month
-        return date(int(year), month, int(start_day)), date(int(year), month, int(end_day))
+        start_month_name, start_day, end_month_name, end_day, year = match.groups()
+        start_month = MONTH_ALIASES[start_month_name.lower()]
+        end_month = MONTH_ALIASES[(end_month_name or start_month_name).lower()]
+        start = date(int(year), start_month, int(start_day))
+        end = date(int(year), end_month, int(end_day))
+        if end < start:
+            end = end.replace(year=end.year + 1)
+        return start, end
 
     def _lines(self, text: str) -> list[str]:
         return [" ".join(line.split()) for line in text.splitlines() if line.split()]
@@ -211,7 +248,12 @@ class PearkesPDFScraper(BaseScraper):
         return dates
 
     def _days_from_note(self, note: str) -> list[int]:
-        match = re.search(r"(?:Apr|April)\s+(\d[\d,\s&]*)", note, re.I)
+        match = re.search(
+            r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|"
+            r"Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d[\d,\s&]*)",
+            note,
+            re.I,
+        )
         if not match:
             return []
         return [int(value) for value in re.findall(r"\d{1,2}", match.group(1))]

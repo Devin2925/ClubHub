@@ -1,4 +1,5 @@
 import hashlib
+import html
 import re
 from datetime import date, datetime, timedelta
 from io import BytesIO
@@ -9,7 +10,8 @@ from pypdf import PdfReader
 from scrapers.base import BaseScraper
 
 
-PAGE_URL = "https://cookstreetvillageactivitycentre.com/calendar-and-programs"
+CALENDAR_PAGE_URL = "https://cookstreetvillageactivitycentre.com/calendar"
+PROGRAMS_PAGE_URL = "https://cookstreetvillageactivitycentre.com/programs"
 DAY_NAMES = ["MONDAYS", "TUESDAYS", "WEDNESDAYS", "THURSDAYS", "FRIDAYS", "SATURDAYS"]
 DAY_TO_INDEX = {
     "MONDAYS": 0,
@@ -29,17 +31,28 @@ class CookStreetPDFScraper(BaseScraper):
         self.session.headers.update({"User-Agent": "Mozilla/5.0"})
 
     def _discover_urls(self) -> tuple[str, str]:
-        response = self.session.get(PAGE_URL, timeout=30)
-        response.raise_for_status()
-        text = response.text
-        urls = sorted(set(re.findall(r"https://storage\.googleapis\.com/[^\"]+", text)))
+        texts = []
+        for page_url in (CALENDAR_PAGE_URL, PROGRAMS_PAGE_URL):
+            response = self.session.get(page_url, timeout=30)
+            response.raise_for_status()
+            texts.append(response.text)
+        urls = sorted(
+            set(
+                html.unescape(url)
+                for url in re.findall(
+                    r'(?:href|data-href)="(https://storage\.googleapis\.com/[^"]+)"',
+                    "\n".join(texts),
+                )
+            )
+        )
 
         calendar_url = ""
         guide_url = ""
         current = datetime.utcnow()
         current_label = current.strftime("%B %Y")
         for url in urls:
-            if "Program Guide.pdf" in url:
+            lowered = url.lower()
+            if "program guide" in lowered and ".pdf" in lowered:
                 guide_url = url
             if f"{current_label}.pdf" in url:
                 calendar_url = url

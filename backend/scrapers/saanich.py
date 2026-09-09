@@ -14,7 +14,7 @@ HEADERS = {
 
 SAANICH_CENTERS = {
     94: "Cedar Hill Recreation Centre",
-    96: "G.R. Pearkes Recreation Centre",
+    96: "G. R. Pearkes Recreation Centre",
     74: "Saanich Commonwealth Place",
     98: "Gordon Head Recreation Centre",
     95: "Colquitz Middle School",

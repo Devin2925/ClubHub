@@ -62,7 +62,19 @@ class OakBayGroupFitnessPDFScraper(BaseScraper):
         # Split on the midpoint between column centres. Splitting on the midpoint
         # between the header word starts drifts right of the real column edge and
         # slices characters off the neighbouring cell.
-        centres = [header_line.index(day) + len(day) / 2 for day in DAY_NAMES]
+        centres = []
+        for day in DAY_NAMES:
+            try:
+                start = header_line.index(day)
+                width = len(day)
+            except ValueError:
+                pattern = r"\s*".join(re.escape(char) for char in day)
+                match = re.search(pattern, header_line, re.I)
+                if not match:
+                    raise
+                start = match.start()
+                width = match.end() - match.start()
+            centres.append(start + width / 2)
         boundaries = [0]
         for idx in range(len(centres) - 1):
             boundaries.append(int((centres[idx] + centres[idx + 1]) // 2))

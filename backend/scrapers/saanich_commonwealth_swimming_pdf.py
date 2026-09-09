@@ -8,7 +8,7 @@ import requests
 from pypdf import PdfReader
 
 from models import Event, SessionLocal
-from scrapers.base import BaseScraper
+from scrapers.base import BaseScraper, strip_html
 
 
 PAGE_URL = "https://www.saanich.ca/EN/main/parks-recreation-community/recreation/schedules/swimming.html"
@@ -21,8 +21,34 @@ TIME_RANGE_RE = re.compile(
 MONTHS = (
     "January|February|March|April|May|June|July|August|September|October|November|December"
 )
+MONTH_ALIASES = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
 WEEK_WINDOW_RE = re.compile(
-    rf"({MONTHS})\s+(\d{{1,2}})\s*[-–]\s*(?:({MONTHS})\s+)?(\d{{1,2}})",
+    rf"({MONTHS}|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+(\d{{1,2}})\s*[-–]\s*(?:({MONTHS}|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+)?(\d{{1,2}})",
     re.I,
 )
 # Everything after any of these markers is legend/description text, not schedule grid.
@@ -82,6 +108,26 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
                 pdfs.append(absolute)
         return sorted(set(pdfs))
 
+    def _current_closure_window(self) -> tuple[date, date] | None:
+        response = self.session.get(PAGE_URL, timeout=30)
+        response.raise_for_status()
+        text = " ".join(strip_html(response.text).split())
+        match = re.search(
+            r"([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*(?:([A-Z][a-z]+)\s+)?(\d{1,2})\s*[-–]\s*Annual Maintenance Closure",
+            text,
+        )
+        if not match:
+            return None
+        start_month, start_day, end_month, end_day = match.groups()
+        today = date.today()
+        start = date(today.year, MONTH_ALIASES[start_month.lower()], int(start_day))
+        end = date(today.year, MONTH_ALIASES[(end_month or start_month).lower()], int(end_day))
+        if end < start:
+            end = end.replace(year=end.year + 1)
+        if start <= today <= end:
+            return start, end
+        return None
+
     def _read_pdf(self, pdf_url: str) -> tuple[str, str]:
         """Return (reading-order text, layout-preserving text) for page 1."""
         response = self.session.get(pdf_url, timeout=30)
@@ -109,10 +155,8 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
         start_month, start_day, end_month, end_day = match.groups()
         end_month = end_month or start_month
         today = date.today()
-        start = datetime.strptime(
-            f"{start_month} {start_day} {today.year}", "%B %d %Y"
-        ).date()
-        end = datetime.strptime(f"{end_month} {end_day} {today.year}", "%B %d %Y").date()
+        start = date(today.year, MONTH_ALIASES[start_month.lower()], int(start_day))
+        end = date(today.year, MONTH_ALIASES[end_month.lower()], int(end_day))
         if end < start:
             end = end.replace(year=end.year + 1)
         # A schedule published across the new year can name a month already behind us.
@@ -389,6 +433,19 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
             schedules.append((pdf_url, kind, plain_text, layout_text, week_start, week_end))
 
         if not schedules:
+            closure = self._current_closure_window()
+            if closure:
+                start, end = closure
+                print(
+                    f"[{self.municipality}] Commonwealth swimming PDF skipped: "
+                    f"maintenance closure {start.isoformat()} to {end.isoformat()}."
+                )
+                self.last_reported_count = 0
+                self.last_status_note = (
+                    f"planned_closure: maintenance closure {start.isoformat()} to {end.isoformat()}"
+                )
+                self.replace_existing_events()
+                return []
             raise ValueError("Could not find current Commonwealth swimming PDFs")
 
         start_date = min(item[4] for item in schedules)

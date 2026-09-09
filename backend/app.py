@@ -81,6 +81,7 @@ def serialize_source_status(row: SourceSyncStatus) -> dict:
 
 def build_source_alert(row: SourceSyncStatus) -> dict | None:
     payload = serialize_source_status(row)
+    planned_closure = (row.last_error or "").startswith("planned_closure:")
     reasons = []
     severity = "info"
 
@@ -94,6 +95,8 @@ def build_source_alert(row: SourceSyncStatus) -> dict | None:
     if payload["freshness"] == "stale":
         severity = "warning" if severity != "error" else severity
         reasons.append("source_sync_stale")
+    if planned_closure:
+        return None
     if previous > 0 and current == 0:
         severity = "error"
         reasons.append("returned_zero_after_previous_data")

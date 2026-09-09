@@ -37,6 +37,18 @@ MONTH_MAP = {
 
 class FernwoodScraper(BaseScraper):
     API_URL = "https://fernwoodnrg.ca/wp-json/wp/v2/ajde_events?per_page=100&_fields=id,date,title,link,content"
+    FIELD_LABELS = (
+        "Day",
+        "Date",
+        "Dates",
+        "Duration",
+        "Time",
+        "Where",
+        "Meeting Point",
+        "Who",
+        "Type",
+        "Note",
+    )
 
     def __init__(self):
         super().__init__("fernwood", "Victoria")
@@ -96,17 +108,21 @@ class FernwoodScraper(BaseScraper):
 
     def _parse_duration_window(self, raw: str) -> tuple[datetime, datetime] | None:
         cleaned = raw.replace("–", "-").replace("—", "-")
-        match = re.search(r"([A-Za-z]+)\s*-\s*([A-Za-z]+)\s+(\d{4})", cleaned)
+        match = re.search(
+            r"([A-Za-z]+)(?:\s+\d{1,2})?\s*-\s*([A-Za-z]+)(?:\s+\d{1,2})?\s*(\d{4})?",
+            cleaned,
+        )
         if not match:
             return None
         start_month = MONTH_MAP[match.group(1).lower()]
         end_month = MONTH_MAP[match.group(2).lower()]
-        year = int(match.group(3))
+        year = int(match.group(3) or datetime.utcnow().year)
         start_dt = datetime(year, start_month, 1)
+        end_year = year + 1 if end_month < start_month else year
         if end_month == 12:
-            end_dt = datetime(year + 1, 1, 1) - timedelta(days=1)
+            end_dt = datetime(end_year + 1, 1, 1) - timedelta(days=1)
         else:
-            end_dt = datetime(year, end_month + 1, 1) - timedelta(days=1)
+            end_dt = datetime(end_year, end_month + 1, 1) - timedelta(days=1)
         return start_dt, end_dt
 
     def _parse_single_date(self, raw: str) -> datetime | None:
@@ -122,8 +138,52 @@ class FernwoodScraper(BaseScraper):
         return None
 
     def _extract_field(self, text: str, label: str) -> str:
-        match = re.search(rf"{label}:\s*(.+?)(?=\s+[A-Z][a-z]+:|$)", text, re.I)
+        labels = "|".join(re.escape(value) for value in self.FIELD_LABELS if value != label)
+        match = re.search(rf"{label}:\s*(.+?)(?=(?:{labels}):|$)", text, re.I)
         return match.group(1).strip() if match else ""
+
+    def _weekdays_from_field(self, raw: str) -> list[int]:
+        cleaned = raw.lower().replace("weekly on", "").replace("every", "")
+        found = []
+        for name, index in WEEKDAY_MAP.items():
+            if re.search(rf"\b{name}s?\b", cleaned):
+                found.append(index)
+
+        range_match = re.search(
+            r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?\s*[-–]\s*"
+            r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?\b",
+            cleaned,
+        )
+        if range_match:
+            start = WEEKDAY_MAP[range_match.group(1)]
+            end = WEEKDAY_MAP[range_match.group(2)]
+            if start <= end:
+                found.extend(range(start, end + 1))
+
+        ordered = []
+        for index in found:
+            if index not in ordered:
+                ordered.append(index)
+        return ordered
+
+    def _explicit_dates_from_field(self, raw: str) -> list[datetime]:
+        current_year = datetime.utcnow().year
+        dates = []
+        current_month = None
+        for month_name, day in re.findall(
+            r"(?:(January|February|March|April|May|June|July|August|September|October|November|December)\s+)?(\d{1,2})",
+            raw,
+            re.I,
+        ):
+            if month_name:
+                current_month = MONTH_MAP[month_name.lower()]
+            if not current_month:
+                continue
+            event_date = datetime(current_year, current_month, int(day))
+            if event_date < datetime.utcnow() - timedelta(days=30):
+                event_date = event_date.replace(year=event_date.year + 1)
+            dates.append(event_date)
+        return dates
 
     def _normalize_item(self, item: dict) -> list[dict]:
         title = html.unescape(item["title"]["rendered"]).strip()
@@ -131,8 +191,14 @@ class FernwoodScraper(BaseScraper):
             return []
         rendered = html.unescape(item["content"]["rendered"])
         description = " ".join(strip_html(rendered).split())
+        description = re.sub(
+            rf"(?<!^)(?=({'|'.join(re.escape(label) for label in self.FIELD_LABELS)}):)",
+            " ",
+            description,
+        )
         date_field = self._extract_field(description, "Date")
         dates_field = self._extract_field(description, "Dates")
+        day_field = self._extract_field(description, "Day")
         duration_field = self._extract_field(description, "Duration")
         time_field = self._extract_field(description, "Time")
         where_field = self._extract_field(description, "Where") or self._extract_field(description, "Meeting Point")
@@ -142,14 +208,25 @@ class FernwoodScraper(BaseScraper):
             return []
 
         events = []
-        if dates_field and duration_field:
-            weekday_name = dates_field.rstrip("s").lower()
-            weekday = WEEKDAY_MAP.get(weekday_name)
+        recurring_field = dates_field or day_field
+        if recurring_field and duration_field:
+            weekdays = self._weekdays_from_field(recurring_field)
             window = self._parse_duration_window(duration_field)
-            if weekday is None or not window:
+            if not weekdays or not window:
                 return []
             start_dt, end_dt = window
-            for start_time, end_time in self._weekly_occurrences(weekday, start_dt, end_dt, time_range):
+            for weekday in weekdays:
+                for start_time, end_time in self._weekly_occurrences(weekday, start_dt, end_dt, time_range):
+                    if start_time < datetime.utcnow() - timedelta(days=1):
+                        continue
+                    events.append(self._build_event(title, start_time, end_time, description, item["link"], facility_name))
+            return events
+
+        explicit_dates = self._explicit_dates_from_field(date_field or dates_field)
+        if explicit_dates:
+            for event_date in explicit_dates:
+                start_time = event_date.replace(hour=time_range[0], minute=time_range[1])
+                end_time = event_date.replace(hour=time_range[2], minute=time_range[3])
                 if start_time < datetime.utcnow() - timedelta(days=1):
                     continue
                 events.append(self._build_event(title, start_time, end_time, description, item["link"], facility_name))
