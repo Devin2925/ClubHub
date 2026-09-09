@@ -23,6 +23,9 @@ interface StatusData {
   };
 }
 
+const INITIAL_EVENT_LIMIT = 80;
+const EVENT_LIMIT_STEP = 80;
+
 export default function HomePage() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -34,6 +37,7 @@ export default function HomePage() {
   const [activeVenue, setActiveVenue] = useState("");
   const [activeDate, setActiveDate] = useState("");
   const [activeSport, setActiveSport] = useState("");
+  const [visibleEventLimit, setVisibleEventLimit] = useState(INITIAL_EVENT_LIMIT);
   const feedbackEmail = "clubhubvictoria@gmail.com";
 
   async function refreshData() {
@@ -137,13 +141,15 @@ export default function HomePage() {
 
   const groupedEvents = useMemo(() => {
     const groups: Record<string, EventData[]> = {};
-    for (const event of filteredEvents) {
+    for (const event of filteredEvents.slice(0, visibleEventLimit)) {
       const key = getDateKey(event.start_time);
       if (!groups[key]) groups[key] = [];
       groups[key].push(event);
     }
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredEvents]);
+  }, [filteredEvents, visibleEventLimit]);
+
+  const hasMoreEvents = filteredEvents.length > visibleEventLimit;
 
   useEffect(() => {
     setActiveVenue("");
@@ -160,6 +166,10 @@ export default function HomePage() {
     setActiveSport("");
   }, [activeDate]);
 
+  useEffect(() => {
+    setVisibleEventLimit(INITIAL_EVENT_LIMIT);
+  }, [activeMunicipality, activeVenue, activeDate, activeSport]);
+
   if (loading) {
     return (
       <main className="page">
@@ -173,10 +183,10 @@ export default function HomePage() {
       <div className="container">
         <section className="hero hero-simple">
           <h1>
-            ClubHub Victoria helps you find <strong>drop-ins, classes, and rec schedules</strong> across Victoria, BC
+            Find <strong>drop-ins, classes, and rec schedules</strong> across Victoria
           </h1>
           <p className="hero-subtitle">
-            Browse upcoming recreation schedules across Greater Victoria by municipality, rec centre, sport, and date, from swims and skates to pickleball, hockey, fitness, and community programs.
+            Pick a municipality, choose a rec centre, and scan upcoming swims, skates, pickleball, hockey, fitness, and community programs.
           </p>
 
           <div className="hero-actions">
@@ -203,7 +213,7 @@ export default function HomePage() {
             {DEMO_MODE ? "Mode: demo snapshot" : `Mode: live API at ${API_BASE}`} · Times shown in {DISPLAY_TIME_ZONE}
           </div>
 
-          <div className="trust-strip">
+          <div className="trust-strip" aria-label="Site status and feedback">
             <div className="trust-card">
               <div className="trust-kicker">Coverage</div>
               <div className="trust-copy">
@@ -347,7 +357,9 @@ export default function HomePage() {
           <h2 className="section-title">
             {activeVenue || activeMunicipality || "All upcoming activities"}
           </h2>
-          <p className="section-copy">{filteredEvents.length} activities showing</p>
+          <p className="section-copy">
+            Showing {Math.min(filteredEvents.length, visibleEventLimit)} of {filteredEvents.length} activities
+          </p>
         </section>
 
         {groupedEvents.length === 0 ? (
@@ -370,6 +382,17 @@ export default function HomePage() {
             </div>
           ))
         )}
+        {hasMoreEvents ? (
+          <div className="show-more-row">
+            <button
+              className="show-more-button"
+              type="button"
+              onClick={() => setVisibleEventLimit((current) => current + EVENT_LIMIT_STEP)}
+            >
+              Show {Math.min(EVENT_LIMIT_STEP, filteredEvents.length - visibleEventLimit)} more
+            </button>
+          </div>
+        ) : null}
       </div>
     </main>
   );

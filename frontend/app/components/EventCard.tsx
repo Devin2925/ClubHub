@@ -13,9 +13,10 @@ import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 
 interface EventCardProps {
   event: EventData;
+  includeStructuredData?: boolean;
 }
 
-export default function EventCard({ event }: EventCardProps) {
+export default function EventCard({ event, includeStructuredData = false }: EventCardProps) {
   const sport = getSportMeta(event.sport_type);
   const offering = getOfferingMeta(event.offering_type);
   const Icon = SPORT_ICON_COMPONENTS[event.sport_type] || GenericSportIcon;
@@ -60,10 +61,12 @@ export default function EventCard({ event }: EventCardProps) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      {includeStructuredData ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      ) : null}
 
       <div className="event-card">
         <div className="event-time">
