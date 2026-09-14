@@ -9,6 +9,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import func
 
+from camp_sources import CAMP_SOURCES
 from models import SessionLocal, Event, SourceSyncStatus, VenueSyncStatus, init_db
 
 app = Flask(__name__)
@@ -208,6 +209,10 @@ def get_events():
         if offering_type:
             query = query.filter(Event.offering_type == offering_type.lower())
 
+        municipality = request.args.get("municipality")
+        if municipality:
+            query = query.filter(Event.municipality.ilike(f"%{municipality}%"))
+
         # Venue filter
         venue = request.args.get("venue")
         if venue:
@@ -250,6 +255,79 @@ def get_events():
         })
     finally:
         db.close()
+
+
+@app.route("/api/camps", methods=["GET"])
+def get_camps():
+    """Get upcoming camp offerings with optional municipality, venue, and date filters."""
+    db = SessionLocal()
+    try:
+        query = db.query(Event).filter(Event.offering_type == "camp")
+
+        include_past = request.args.get("include_past", "").lower() in {"1", "true", "yes"}
+        if not include_past:
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(Event.start_time >= today_start)
+
+        municipality = request.args.get("municipality")
+        if municipality:
+            query = query.filter(Event.municipality.ilike(f"%{municipality}%"))
+
+        venue = request.args.get("venue")
+        if venue:
+            query = query.filter(Event.venue_name.ilike(f"%{venue}%"))
+
+        date_str = request.args.get("date")
+        if date_str:
+            try:
+                day = datetime.strptime(date_str, "%Y-%m-%d")
+                next_day = day + timedelta(days=1)
+                query = query.filter(Event.start_time >= day, Event.start_time < next_day)
+            except ValueError:
+                pass
+
+        from_str = request.args.get("from")
+        if from_str:
+            try:
+                from_dt = datetime.fromisoformat(from_str)
+                query = query.filter(Event.start_time >= from_dt)
+            except ValueError:
+                pass
+
+        to_str = request.args.get("to")
+        if to_str:
+            try:
+                to_dt = datetime.fromisoformat(to_str)
+                query = query.filter(Event.start_time <= to_dt)
+            except ValueError:
+                pass
+
+        events = query.order_by(Event.start_time.asc()).all()
+        return jsonify({
+            "count": len(events),
+            "events": [e.to_dict() for e in events],
+        })
+    finally:
+        db.close()
+
+
+@app.route("/api/camp-sources", methods=["GET"])
+def get_camp_sources():
+    """Return configured camp provider coverage and scrape strategy metadata."""
+    active_count = len([source for source in CAMP_SOURCES if source["automation_status"] == "active"])
+    partial_count = len([source for source in CAMP_SOURCES if source["automation_status"] == "partial"])
+    planned_count = len([source for source in CAMP_SOURCES if source["automation_status"] == "planned"])
+    return jsonify(
+        {
+            "sources": CAMP_SOURCES,
+            "summary": {
+                "total": len(CAMP_SOURCES),
+                "active": active_count,
+                "partial": partial_count,
+                "planned": planned_count,
+            },
+        }
+    )
 
 
 @app.route("/api/events/<int:event_id>", methods=["GET"])

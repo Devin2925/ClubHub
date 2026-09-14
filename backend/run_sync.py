@@ -27,6 +27,7 @@ from scrapers.recdesk_calendar import RecDeskCalendarScraper
 from scrapers.saanich import SaanichScraper
 from scrapers.vikesrec import VikesRecScraper
 from scrapers.wspr import WSPRScraper
+from scrapers.wspr_camps import WSPRCampsScraper
 from venue_registry import VENUE_REGISTRY
 
 SCRAPER_TIMEOUT_SECONDS = 90
@@ -364,6 +365,7 @@ def iter_scrapers():
     )
     yield ("uvic_vikesrec", "UVic CARSA / Vikes Recreation", "UVic", VikesRecScraper())
     yield ("west_shore_public", "West Shore Parks & Recreation", "West Shore", WSPRScraper())
+    yield ("west_shore_camps", "West Shore Parks & Recreation Camps", "West Shore", WSPRCampsScraper())
 
 
 def list_sync_targets():

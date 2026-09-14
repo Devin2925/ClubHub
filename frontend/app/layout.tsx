@@ -17,6 +17,8 @@ export const metadata: Metadata = {
     "Victoria BC recreation schedules",
     "Greater Victoria drop-in sports",
     "Victoria BC classes and rec centres",
+    "Victoria BC kids camps",
+    "Victoria BC summer camps",
     "Victoria BC pickleball hockey swimming",
   ],
   alternates: {
@@ -155,6 +157,9 @@ export default function RootLayout({
               </Link>
               <Link href="/venues" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
                 Rec Centres
+              </Link>
+              <Link href="/camps" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
+                Camps
               </Link>
               <Link href="/status" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
                 Status

@@ -23,6 +23,7 @@ export const OFFERING_META: Record<string, { label: string }> = {
   "drop-in": { label: "Drop-In" },
   pickup: { label: "Pickup" },
   class: { label: "Class" },
+  camp: { label: "Camp" },
 };
 
 export function getSportMeta(sportType: string) {

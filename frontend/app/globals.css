@@ -655,6 +655,64 @@ button {
   gap: 0.75rem;
 }
 
+.source-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.source-status {
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.source-status-active {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.source-status-partial {
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.source-status-planned {
+  border-color: var(--border-color-hover);
+}
+
+.camp-source-tags,
+.camp-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.camp-source-tags {
+  margin: 0.85rem 0 1rem;
+}
+
+.camp-source-tags span {
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.camp-source-actions {
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .municipality-section {
   margin-bottom: 2rem;
 }

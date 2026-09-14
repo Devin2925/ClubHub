@@ -59,6 +59,19 @@ type DemoVenueAlertRow = {
   last_succeeded_at: string | null;
 };
 
+export type DemoCampSourceRow = {
+  source_key: string;
+  name: string;
+  municipality: string;
+  venue_names: string[];
+  primary_url: string;
+  registration_url: string;
+  automation_status: "active" | "partial" | "planned";
+  scrape_strategy: string;
+  sync_source_key: string;
+  tags: string[];
+};
+
 type DemoSnapshot = {
   generated_at: string;
   counts: {
@@ -81,6 +94,7 @@ type DemoSnapshot = {
   source_alerts: DemoSourceAlertRow[];
   venue_alerts: DemoVenueAlertRow[];
   events: EventData[];
+  camp_sources?: DemoCampSourceRow[];
   sources: DemoSourceRow[];
   venues: DemoVenueRow[];
 };
@@ -97,6 +111,10 @@ export function getDemoSnapshot(): DemoSnapshot {
 
 export function getDemoEvents(): EventData[] {
   return getDemoSnapshot().events || [];
+}
+
+export function getDemoCampSources(): DemoCampSourceRow[] {
+  return getDemoSnapshot().camp_sources || [];
 }
 
 export function getDemoSourceAlerts(): DemoSourceAlertRow[] {

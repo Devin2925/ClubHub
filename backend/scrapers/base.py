@@ -103,6 +103,28 @@ CLASS_PATTERNS = [
     r"\baqua\s*fit\b",
 ]
 
+CAMP_BREAK_PATTERNS = [
+    r"\bpro[-\s]?d(?:ay)?\b",
+    r"\bprofessional\s+development\s+day\b",
+    r"\bspring\s+break\b",
+    r"\bwinter\s+break\b",
+    r"\bsummer\s+break\b",
+]
+
+CAMP_CONTEXT_PATTERNS = [
+    r"\bday\s+camps?\b",
+    r"\bsummer\s+camps?\b",
+    r"\bschool[-\s]?year\s+camps?\b",
+    r"\blicensed\s+camps?\b",
+    r"\bspecialty\s+camps?\b",
+    r"\bkids?\s+camps?\b",
+    r"\bchildren'?s?\s+camps?\b",
+    r"\byouth\s+camps?\b",
+    r"\bteen\s+camps?\b",
+    r"\bpreschool\s+camps?\b",
+    r"\bcamps?\s+(for|ages?|registration|open|available|with|at|running|including|offered)\b",
+]
+
 REGISTRATION_REQUIRED_PATTERNS = [
     r"reserved",
     r"advanced\s*registration",
@@ -137,6 +159,8 @@ SKILL_LEVEL_PATTERNS = [
 def classify_offering_type(title: str, description: str = "") -> str:
     """Classify an event into product-facing offering types."""
     haystack = f"{title} {description}".lower()
+    if is_camp_offering(title, description):
+        return "camp"
     for pattern in PICKUP_PATTERNS:
         if re.search(pattern, haystack):
             return "pickup"
@@ -153,6 +177,30 @@ def classify_offering_type(title: str, description: str = "") -> str:
     if sport in {"hockey", "pickleball", "badminton", "soccer", "basketball", "volleyball", "squash", "tennis"}:
         return "drop-in"
     return "drop-in"
+
+
+def is_camp_offering(title: str, description: str = "") -> bool:
+    haystack = f"{title} {description}".lower()
+    title_lower = title.lower()
+
+    has_bootcamp = re.search(r"\bboot\s*camp\b|\bbootcamp\b", haystack)
+    has_child_or_break_context = re.search(
+        r"\b(pro[-\s]?d(?:ay)?|professional\s+development\s+day|spring\s+break|"
+        r"winter\s+break|summer\s+break|summer\s+day|day\s+camp|kids?|children|"
+        r"youth|teen|preschool|school[-\s]?age)\b",
+        haystack,
+    )
+    if has_bootcamp and not has_child_or_break_context:
+        return False
+
+    if re.search(r"\bcamps?\b", haystack):
+        for pattern in CAMP_BREAK_PATTERNS + CAMP_CONTEXT_PATTERNS:
+            if re.search(pattern, haystack):
+                return True
+        if re.search(r"\bcamps?\b", title_lower) and not has_bootcamp:
+            return True
+
+    return False
 
 
 def classify_registration_required(title: str, description: str = ""):

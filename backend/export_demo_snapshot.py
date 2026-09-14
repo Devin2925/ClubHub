@@ -4,6 +4,7 @@ import sqlite3
 from datetime import UTC, datetime
 
 from app import build_source_alert, build_venue_alert, serialize_source_status
+from camp_sources import CAMP_SOURCES
 from models import SessionLocal, SourceSyncStatus, VenueSyncStatus
 
 
@@ -60,6 +61,7 @@ def main():
         "source_alerts": source_alerts,
         "venue_alerts": venue_alerts,
         "events": events,
+        "camp_sources": CAMP_SOURCES,
         "sources": source_rows,
         "venues": venue_rows,
     }

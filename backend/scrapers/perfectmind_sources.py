@@ -29,6 +29,13 @@ PERFECTMIND_SOURCES = [
         "use_playwright": False,
     },
     {
+        "subdomain": "seaparcrecreation",
+        "municipality": "Sooke",
+        "widget_id": "15f6af07-39c5-473e-b053-96653f77a406",
+        "account_id": "22953",
+        "use_playwright": False,
+    },
+    {
         "subdomain": "oakbayrec",
         "municipality": "Oak Bay",
         "widget_id": "403780fd-76ad-4aaf-9816-c964b90d626d",
