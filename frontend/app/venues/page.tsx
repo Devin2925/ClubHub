@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DEMO_MODE, getDemoEvents } from "../lib/demo";
 import { API_BASE, EventData, formatFullDate, venueSlug } from "../lib/utils";
+import { closureHeadline, VENUE_CLOSURES } from "../lib/closures";
 
 export default function VenuesPage() {
   const [events, setEvents] = useState<EventData[]>(() => (DEMO_MODE ? getDemoEvents() : []));
@@ -43,14 +44,22 @@ export default function VenuesPage() {
       }
     }
 
-    return Array.from(map.entries())
-      .map(([venueName, value]) => ({
-        venueName,
-        municipality: value.municipality,
-        count: value.count,
-        nextTime: value.nextTime,
-      }))
-      .sort((a, b) => a.venueName.localeCompare(b.venueName));
+    const cards = Array.from(map.entries()).map(([venueName, value]) => ({
+      venueName,
+      municipality: value.municipality,
+      count: value.count,
+      nextTime: value.nextTime,
+      closure: VENUE_CLOSURES.find((closure) => closure.venueName === venueName),
+    }));
+
+    for (const closure of VENUE_CLOSURES) {
+      if (map.has(closure.venueName)) continue;
+      if (activeMunicipality && closure.municipality !== activeMunicipality) continue;
+      if (searchTerm.trim() && !closure.venueName.toLowerCase().includes(searchTerm.trim().toLowerCase())) continue;
+      cards.push({ venueName: closure.venueName, municipality: closure.municipality, count: 0, nextTime: "", closure });
+    }
+
+    return cards.sort((a, b) => a.venueName.localeCompare(b.venueName));
   }, [activeMunicipality, events, searchTerm]);
 
   if (loading) {
@@ -101,10 +110,17 @@ export default function VenuesPage() {
             <Link key={venue.venueName} href={`/venues/${venueSlug(venue.venueName)}`} className="venue-card">
               <div className="venue-card-municipality">{venue.municipality}</div>
               <div className="venue-card-name">{venue.venueName}</div>
-              <div className="venue-card-count">{venue.count} upcoming activities</div>
-              <div className="venue-card-next">
-                Next activity: {formatFullDate(venue.nextTime)}
-              </div>
+              {venue.closure && <div className="venue-card-closure">{closureHeadline(venue.closure)}</div>}
+              {venue.count > 0 ? (
+                <>
+                  <div className="venue-card-count">{venue.count} upcoming activities</div>
+                  <div className="venue-card-next">
+                    Next activity: {formatFullDate(venue.nextTime)}
+                  </div>
+                </>
+              ) : (
+                <div className="venue-card-count">No scheduled activities</div>
+              )}
             </Link>
           ))}
         </div>

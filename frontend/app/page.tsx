@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
 import { DEMO_MODE, getDemoEvents, getDemoStatus } from "./lib/demo";
-import { API_BASE, DISPLAY_TIME_ZONE, EventData, formatDateTime, formatFullDate, getDateKey, getSportMeta } from "./lib/utils";
+import { API_BASE, DISPLAY_TIME_ZONE, EventData, formatDateTime, formatFullDate, getDateKey, getSportMeta, venueSlug } from "./lib/utils";
+import { closureHeadline, VENUE_CLOSURES } from "./lib/closures";
 
 interface StatusData {
   last_fetched: string | null;
@@ -105,6 +106,10 @@ export default function HomePage() {
     const filtered = events.filter((event) => !activeMunicipality || event.municipality === activeMunicipality);
     return Array.from(new Set(filtered.map((event) => event.venue_name))).sort();
   }, [events, activeMunicipality]);
+
+  const municipalityClosures = VENUE_CLOSURES.filter(
+    (closure) => activeMunicipality && closure.municipality === activeMunicipality
+  );
 
   const dates = useMemo(() => {
     const filtered = events.filter((event) => {
@@ -296,6 +301,15 @@ export default function HomePage() {
               </select>
             </div>
           </div>
+
+          {municipalityClosures.map((closure) => (
+            <p key={closure.venueName} className="closure-inline-note">
+              <strong>{closure.venueName}</strong> is {closureHeadline(closure).toLowerCase()}.{" "}
+              <a className="inline-link" href={`/venues/${venueSlug(closure.venueName)}`}>
+                Details
+              </a>
+            </p>
+          ))}
 
           <div className="simple-date-row">
             <div className="chip-group-label">Dates</div>

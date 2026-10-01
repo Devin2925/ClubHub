@@ -8,6 +8,7 @@ import {
   venueSlug,
 } from "../../lib/utils";
 import { getVenueSnapshot, SITE_NAME } from "../../lib/seo";
+import { closureHeadline, getVenueClosure } from "../../lib/closures";
 
 type Props = {
   params: Promise<{ venue: string }>;
@@ -18,8 +19,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const venueData = getVenueSnapshot(resolvedParams.venue);
   const displayTitle = venueData.venueName;
   const title = `${displayTitle} | Drop-In and Recreation Schedules in ${venueData.municipality}`;
-  const description =
-    venueData.eventCount > 0
+  const closure = getVenueClosure(resolvedParams.venue);
+  const description = closure
+    ? `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. ${closure.summary}`
+    : venueData.eventCount > 0
       ? `See ${venueData.eventCount} upcoming activities at ${displayTitle} in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}.`
       : `See upcoming drop-ins, classes, and recreation schedules at ${displayTitle} in ${venueData.municipality}, BC on ${SITE_NAME}.`;
 
@@ -59,8 +62,9 @@ export default async function VenueDetailPage({ params }: Props) {
   }
 
   const events = allEvents.filter((event) => venueSlug(event.venue_name) === resolvedParams.venue);
-  const venueName = events[0]?.venue_name || resolvedParams.venue;
-  const municipality = events[0]?.municipality || "Greater Victoria";
+  const closure = getVenueClosure(resolvedParams.venue);
+  const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
+  const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
   const venueJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsActivityLocation",
@@ -113,7 +117,7 @@ export default async function VenueDetailPage({ params }: Props) {
         <Link href="/venues" className="section-link" style={{ marginTop: "2rem", display: "inline-flex" }}>
           Back to venue list
         </Link>
-        <VenueScheduleClient events={events} venueName={venueName} municipality={municipality} />
+        <VenueScheduleClient events={events} venueName={venueName} municipality={municipality} closure={closure} />
       </div>
     </main>
   );

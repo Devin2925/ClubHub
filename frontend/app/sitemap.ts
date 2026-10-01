@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import snapshot from "../data/demo-snapshot.json";
 import { venueSlug } from "./lib/utils";
+import { VENUE_CLOSURES } from "./lib/closures";
 
 const siteUrl = "https://clubhubvictoria.ca";
 
@@ -17,6 +18,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     if (event.venue_name) {
       venueSet.add(venueSlug(event.venue_name));
     }
+  }
+
+  for (const closure of VENUE_CLOSURES) {
+    venueSet.add(venueSlug(closure.venueName));
   }
 
   const staticPages: MetadataRoute.Sitemap = [

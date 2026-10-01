@@ -1,5 +1,6 @@
 import snapshot from "../../data/demo-snapshot.json";
 import { getSportMeta, venueSlug } from "./utils";
+import { getVenueClosure } from "./closures";
 
 export const SITE_URL = "https://clubhubvictoria.ca";
 export const SITE_NAME = "ClubHub Victoria";
@@ -26,8 +27,9 @@ export function titleFromSlug(slug: string): string {
 
 export function getVenueSnapshot(slug: string) {
   const venueEvents = events.filter((event) => venueSlug(event.venue_name) === slug);
-  const venueName = venueEvents[0]?.venue_name || titleFromSlug(slug);
-  const municipality = venueEvents[0]?.municipality || "Greater Victoria";
+  const closure = getVenueClosure(slug);
+  const venueName = venueEvents[0]?.venue_name || closure?.venueName || titleFromSlug(slug);
+  const municipality = venueEvents[0]?.municipality || closure?.municipality || "Greater Victoria";
   const sportLabels = Array.from(
     new Set(venueEvents.map((event) => getSportMeta(event.sport_type).label))
   ).slice(0, 4);

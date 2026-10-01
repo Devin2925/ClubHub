@@ -11,17 +11,20 @@ import {
   getOfferingMeta,
   getSportMeta,
 } from "../lib/utils";
+import { closureHeadline, VenueClosure } from "../lib/closures";
 
 interface VenueScheduleClientProps {
   events: EventData[];
   venueName: string;
   municipality: string;
+  closure?: VenueClosure;
 }
 
 export default function VenueScheduleClient({
   events,
   venueName,
   municipality,
+  closure,
 }: VenueScheduleClientProps) {
   const [activeDate, setActiveDate] = useState("");
   const [activeSport, setActiveSport] = useState("");
@@ -75,8 +78,39 @@ export default function VenueScheduleClient({
     ).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEvents]);
 
+  const closureNotice = closure ? (
+    <section className="closure-notice" role="status">
+      <div className="closure-notice-kicker">{closureHeadline(closure)}</div>
+      <p className="closure-notice-copy">{closure.summary}</p>
+      {closure.alternative && (
+        <p className="closure-notice-copy">
+          Interim location: <strong>{closure.alternative.name}</strong>, {closure.alternative.address} (opening{" "}
+          {closure.alternative.opensLabel}).
+        </p>
+      )}
+      <a className="inline-link" href={closure.infoUrl} target="_blank" rel="noopener noreferrer">
+        City closure details and FAQ
+      </a>
+    </section>
+  ) : null;
+
+  if (closure && events.length === 0) {
+    return (
+      <>
+        <section className="hero" style={{ paddingTop: "3rem" }}>
+          <div className="chip-group-label">{municipality}</div>
+          <h1>
+            <strong>{venueName}</strong>
+          </h1>
+        </section>
+        {closureNotice}
+      </>
+    );
+  }
+
   return (
     <>
+      {closureNotice}
       <section className="hero" style={{ paddingTop: "3rem" }}>
         <div className="chip-group-label">{municipality}</div>
         <h1>

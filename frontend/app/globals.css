@@ -642,6 +642,45 @@ button {
   color: var(--text-primary);
 }
 
+.closure-notice {
+  margin: 1.5rem 0 2rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border-color-hover);
+  border-left: 3px solid var(--sport-fitness);
+  background: var(--bg-card);
+}
+
+.closure-notice-kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sport-fitness);
+  margin-bottom: 0.6rem;
+}
+
+.closure-notice-copy {
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 0.6rem;
+}
+
+.closure-notice-copy strong {
+  color: var(--text-primary);
+}
+
+.closure-inline-note {
+  margin: 0.9rem 0 1.25rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--sport-fitness);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.closure-inline-note strong {
+  color: var(--text-primary);
+}
+
 .empty-state-mark {
   display: block;
   font-size: 0.78rem;
@@ -883,6 +922,15 @@ button {
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-primary);
+  margin-bottom: 0.45rem;
+}
+
+.venue-card-closure {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sport-fitness);
   margin-bottom: 0.45rem;
 }
 
