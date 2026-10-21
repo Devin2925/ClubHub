@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import {
   EventData,
   formatTime,
+  toScheduleIso,
   getOfferingMeta,
   getSportMeta,
   venueSlug,
@@ -28,8 +29,8 @@ export default function EventCard({ event, includeStructuredData = false }: Even
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: event.title,
-    startDate: event.start_time,
-    endDate: event.end_time,
+    startDate: toScheduleIso(event.start_time),
+    endDate: toScheduleIso(event.end_time),
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     eventStatus: "https://schema.org/EventScheduled",
     location: {

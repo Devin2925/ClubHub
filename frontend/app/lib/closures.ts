@@ -12,6 +12,12 @@ export interface VenueClosure {
     opensLabel: string;
   };
   infoUrl: string;
+  // Open venues to point people to while this one is closed, nearest first.
+  nearby?: {
+    sport: string;
+    heading: string;
+    venues: string[];
+  }[];
 }
 
 // Venues that are closed upstream, so they have no events but are still searched for.
@@ -29,6 +35,24 @@ export const VENUE_CLOSURES: VenueClosure[] = [
       opensLabel: "early 2027",
     },
     infoUrl: "https://www.victoria.ca/parks-recreation/recreation/crystal-pool-fitness-centre",
+    nearby: [
+      {
+        sport: "swimming",
+        heading: "Where to swim while Crystal Pool is closed",
+        venues: [
+          "Oak Bay Recreation Centre",
+          "Esquimalt Recreation Centre",
+          "Saanich Commonwealth Place",
+          "Gordon Head Recreation Centre",
+          "Juan de Fuca Rec Centre",
+        ],
+      },
+      {
+        sport: "skating",
+        heading: "City public skating continues at the arena",
+        venues: ["Save on Foods Memorial Centre"],
+      },
+    ],
   },
 ];
 

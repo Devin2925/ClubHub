@@ -56,6 +56,15 @@ export const metadata: Metadata = {
 };
 
 const feedbackEmail = "clubhubvictoria@gmail.com";
+// Worded the way people search for these venues (Search Console top queries).
+const popularSchedules = [
+  { href: "/venues/henderson-recreation-centre", label: "Henderson Rec Centre schedule" },
+  { href: "/venues/saanich-commonwealth-place", label: "Commonwealth Pool schedule" },
+  { href: "/venues/carsa-vikes-recreation", label: "CARSA drop-in schedule" },
+  { href: "/venues/g-r-pearkes-recreation-centre", label: "Pearkes Rec Centre skating" },
+  { href: "/venues/fairfield-community-place", label: "Fairfield Community Centre" },
+  { href: "/venues/crystal-pool-and-fitness-centre", label: "Crystal Pool closure & alternatives" },
+];
 const brandMark = (
   <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ marginRight: 6 }}>
     <defs>
@@ -178,6 +187,13 @@ export default function RootLayout({
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
               Recreation schedules for drop-ins, classes, and community activities across Victoria, BC and Greater Victoria.
             </p>
+            <nav className="footer-popular" aria-label="Popular schedules">
+              {popularSchedules.map((item) => (
+                <Link key={item.href} href={item.href} className="inline-link">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
             <div className="footer-trust-links">
               <span>Victoria, BC schedule aggregator</span>
               <span>Upcoming dates only</span>

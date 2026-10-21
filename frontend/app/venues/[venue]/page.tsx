@@ -5,9 +5,17 @@ import { DEMO_MODE, getDemoEvents } from "../../lib/demo";
 import {
   API_BASE,
   EventData,
+  getSportMeta,
+  nowScheduleKey,
   venueSlug,
 } from "../../lib/utils";
-import { getVenueSearchName, getVenueSnapshot, SITE_NAME } from "../../lib/seo";
+import {
+  getVenueSearchName,
+  getVenueSeo,
+  getVenueSnapshot,
+  SITE_NAME,
+  snapshotUpdatedLabel,
+} from "../../lib/seo";
 import { closureHeadline, getVenueClosure } from "../../lib/closures";
 
 type Props = {
@@ -17,17 +25,22 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params;
   const venueData = getVenueSnapshot(resolvedParams.venue);
-  const searchName = getVenueSearchName(resolvedParams.venue);
+  const seo = getVenueSeo(resolvedParams.venue);
+  const searchName = seo?.searchName;
   const displayTitle = searchName ? `${venueData.venueName} (${searchName})` : venueData.venueName;
   const closure = getVenueClosure(resolvedParams.venue);
+  const activities = venueData.sportLabels.slice(0, 2).join(" & ");
+  const updated = `Updated ${snapshotUpdatedLabel()}.`;
   const title = closure
     ? `${displayTitle} Schedule: ${closureHeadline(closure)}`
-    : `${displayTitle} Schedule | Drop-Ins in ${venueData.municipality}`;
+    : `${displayTitle} Schedule: ${activities ? `${activities} ` : ""}Drop-Ins in ${venueData.municipality}`;
   const description = closure
-    ? `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. ${closure.summary}`
-    : venueData.eventCount > 0
-      ? `${displayTitle} drop-in schedule: ${venueData.eventCount} upcoming activities in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}.`
-      : `See upcoming drop-ins, classes, and recreation schedules at ${displayTitle} in ${venueData.municipality}, BC on ${SITE_NAME}.`;
+    ? `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. See nearby pool swim times and the interim Victoria Recreation Centre plans. ${updated}`
+    : seo && venueData.eventCount > 0
+      ? `${seo.summary} ${venueData.eventCount} upcoming sessions with times and dates. ${updated}`
+      : venueData.eventCount > 0
+        ? `${displayTitle} drop-in schedule: ${venueData.eventCount} upcoming activities in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}. ${updated}`
+        : `See upcoming drop-ins, classes, and recreation schedules at ${displayTitle} in ${venueData.municipality}, BC on ${SITE_NAME}.`;
 
   return {
     title,
@@ -69,6 +82,7 @@ export default async function VenueDetailPage({ params }: Props) {
   const closure = getVenueClosure(resolvedParams.venue);
   const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
   const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
+  const seo = getVenueSeo(resolvedParams.venue);
   const searchName = getVenueSearchName(resolvedParams.venue);
   const venueJsonLd = {
     "@context": "https://schema.org",
@@ -78,12 +92,41 @@ export default async function VenueDetailPage({ params }: Props) {
     url: `https://clubhubvictoria.ca/venues/${resolvedParams.venue}`,
     address: {
       "@type": "PostalAddress",
+      ...(seo?.address ? { streetAddress: seo.address.split(",")[0] } : {}),
       addressLocality: municipality,
       addressRegion: "BC",
       addressCountry: "CA",
     },
-    description: `Upcoming recreation schedules, drop-ins, and classes at ${venueName} in ${municipality}, British Columbia.`,
+    description:
+      seo?.summary ||
+      `Upcoming recreation schedules, drop-ins, and classes at ${venueName} in ${municipality}, British Columbia.`,
   };
+
+  // While a venue is closed, point visitors at open venues that still run the same activity.
+  const now = nowScheduleKey();
+  const alternatives = (closure?.nearby || []).map((group) => ({
+    heading: group.heading,
+    sportLabel: getSportMeta(group.sport).label.toLowerCase(),
+    venues: group.venues
+      .map((name) => {
+        const sessions = allEvents
+          .filter(
+            (event) =>
+              event.venue_name === name &&
+              event.sport_type === group.sport &&
+              event.start_time.replace("T", " ") >= now
+          )
+          .sort((a, b) => a.start_time.localeCompare(b.start_time));
+        return {
+          name,
+          slug: venueSlug(name),
+          municipality: sessions[0]?.municipality || "",
+          count: sessions.length,
+          next: sessions[0] ? { title: sessions[0].title, start: sessions[0].start_time } : null,
+        };
+      })
+      .filter((venue) => venue.count > 0),
+  }));
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -129,6 +172,9 @@ export default async function VenueDetailPage({ params }: Props) {
           municipality={municipality}
           closure={closure}
           searchName={searchName}
+          summary={seo?.summary}
+          address={seo?.address}
+          alternatives={alternatives}
         />
       </div>
     </main>

@@ -1,5 +1,5 @@
 import snapshot from "../../data/demo-snapshot.json";
-import type { EventData } from "./utils";
+import { getDateKey, getTodayKey, type EventData } from "./utils";
 
 type DemoSourceRow = {
   source_key: string;
@@ -109,8 +109,12 @@ export function getDemoSnapshot(): DemoSnapshot {
   return snapshot as DemoSnapshot;
 }
 
+// The snapshot is frozen at export time, so hide anything that has already finished.
 export function getDemoEvents(): EventData[] {
-  return getDemoSnapshot().events || [];
+  const todayKey = getTodayKey();
+  return (getDemoSnapshot().events || []).filter(
+    (event) => getDateKey(event.end_time || event.start_time) >= todayKey
+  );
 }
 
 export function getDemoCampSources(): DemoCampSourceRow[] {
@@ -137,11 +141,13 @@ export function getDemoSports() {
 
 export function getDemoStatus() {
   const data = getDemoSnapshot();
+  // The export writes naive UTC; mark it so browsers don't read it as local time.
+  const generatedAt = /[zZ]|[+-]\d{2}:\d{2}$/.test(data.generated_at) ? data.generated_at : `${data.generated_at}Z`;
   return {
     admin_access: false,
     status: "demo",
-    last_fetched: data.generated_at,
-    latest_sync_completed_at: data.generated_at,
+    last_fetched: generatedAt,
+    latest_sync_completed_at: generatedAt,
     total_events: data.counts.events,
     source_summary: data.source_summary,
     venue_summary: data.venue_summary,

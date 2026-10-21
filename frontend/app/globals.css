@@ -669,6 +669,66 @@ button {
   color: var(--text-primary);
 }
 
+.closure-alternatives {
+  margin: 0 0 2.5rem;
+}
+
+.closure-alternatives-group + .closure-alternatives-group {
+  margin-top: 2rem;
+}
+
+.closure-alternatives-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+
+.closure-alternative {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  height: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.closure-alternative:hover,
+.closure-alternative:focus-visible {
+  border-color: var(--border-color-hover);
+}
+
+.closure-alternative-name {
+  font-weight: 700;
+}
+
+.closure-alternative-meta,
+.closure-alternative-next {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.footer-popular {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1.25rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.venue-address {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: -0.25rem;
+}
+
 .closure-inline-note {
   margin: 0.9rem 0 1.25rem;
   padding-left: 0.75rem;

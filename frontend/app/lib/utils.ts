@@ -36,51 +36,84 @@ export function getOfferingMeta(offeringType: string) {
 
 export const DISPLAY_TIME_ZONE = "America/Vancouver";
 
+const OFFSET_RE = /(?:[zZ]|[+-]\d{2}:?\d{2})$/;
+const WALL_CLOCK_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/;
+
+// Schedule times are Victoria wall-clock times with no offset ("2026-10-21 05:30:00").
+// Read them as-is, so the server (UTC on Vercel) and every browser show the same
+// time; only values that carry an offset are converted to Victoria time.
+function scheduleDate(value: string): { date: Date; timeZone: string } {
+  const match = WALL_CLOCK_RE.exec(value);
+  if (match && !OFFSET_RE.test(value.trim())) {
+    const [, year, month, day, hour = "0", minute = "0", second = "0"] = match;
+    return {
+      date: new Date(Date.UTC(+year, +month - 1, +day, +hour, +minute, +second)),
+      timeZone: "UTC",
+    };
+  }
+  return { date: new Date(value), timeZone: DISPLAY_TIME_ZONE };
+}
+
+// ISO 8601 with Victoria's UTC offset, for structured data ("2026-10-21T05:30:00-07:00").
+export function toScheduleIso(value: string): string {
+  const match = WALL_CLOCK_RE.exec(value || "");
+  if (!match || OFFSET_RE.test(value.trim())) return value;
+  const [, year, month, day, hour = "00", minute = "00", second = "00"] = match;
+  const guess = new Date(Date.UTC(+year, +month - 1, +day, +hour, +minute, +second));
+  const offset =
+    new Intl.DateTimeFormat("en-US", { timeZone: DISPLAY_TIME_ZONE, timeZoneName: "longOffset" })
+      .formatToParts(guess)
+      .find((part) => part.type === "timeZoneName")
+      ?.value.replace("GMT", "") || "-08:00";
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}${offset || "+00:00"}`;
+}
+
 // Format time from ISO string
 export function formatTime(isoString: string): string {
-  const date = new Date(isoString);
+  const { date, timeZone } = scheduleDate(isoString);
   return date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: DISPLAY_TIME_ZONE,
+    timeZone,
   });
 }
 
 // Format date from ISO string
 export function formatDate(isoString: string): string {
-  const date = new Date(isoString);
+  const { date, timeZone } = scheduleDate(isoString);
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-    timeZone: DISPLAY_TIME_ZONE,
+    timeZone,
   });
 }
 
 // Format full date
 export function formatFullDate(isoString: string): string {
-  const date = new Date(isoString);
+  const { date, timeZone } = scheduleDate(isoString);
   return date.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone: DISPLAY_TIME_ZONE,
+    timeZone,
   });
 }
 
 export function formatMonthDay(isoString: string): string {
-  const date = new Date(isoString);
+  const { date, timeZone } = scheduleDate(isoString);
   return date.toLocaleDateString("en-CA", {
     month: "short",
     day: "numeric",
-    timeZone: DISPLAY_TIME_ZONE,
+    timeZone,
   });
 }
 
+// Sync timestamps are UTC instants; the backend writes them without an offset.
 export function formatDateTime(isoString: string): string {
-  const date = new Date(isoString);
+  const date = new Date(OFFSET_RE.test(isoString.trim()) ? isoString : `${isoString.replace(" ", "T")}Z`);
   return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -104,6 +137,25 @@ export function getTodayKey(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: DISPLAY_TIME_ZONE,
   }).format(new Date());
+}
+
+// Current Victoria wall-clock time, comparable with schedule start_time strings.
+export function nowScheduleKey(): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: DISPLAY_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date())
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 // Check if date is today

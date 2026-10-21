@@ -27,12 +27,6 @@ interface StatusData {
 const INITIAL_EVENT_LIMIT = 80;
 const EVENT_LIMIT_STEP = 80;
 
-// The public site is a frozen snapshot, so hide days that have already passed.
-function dropPastDays(events: EventData[]): EventData[] {
-  const todayKey = getTodayKey();
-  return events.filter((event) => getDateKey(event.start_time) >= todayKey);
-}
-
 export default function HomePage() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -50,7 +44,7 @@ export default function HomePage() {
 
   async function refreshData() {
     if (DEMO_MODE) {
-      setEvents(dropPastDays(getDemoEvents()));
+      setEvents(getDemoEvents());
       setStatus(getDemoStatus());
       return;
     }
@@ -62,7 +56,7 @@ export default function HomePage() {
     const eventsData = await eventsRes.json();
     const statusData = await statusRes.json();
 
-    setEvents(dropPastDays(eventsData.events || []));
+    setEvents(eventsData.events || []);
     setStatus(statusData || null);
   }
 

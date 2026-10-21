@@ -5,8 +5,10 @@ import EventCard from "./EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 import {
   EventData,
+  formatDate,
   formatFullDate,
   formatMonthDay,
+  formatTime,
   getDateKey,
   getOfferingMeta,
   getSportMeta,
@@ -19,6 +21,21 @@ interface VenueScheduleClientProps {
   municipality: string;
   closure?: VenueClosure;
   searchName?: string;
+  summary?: string;
+  address?: string;
+  alternatives?: ClosureAlternativeGroup[];
+}
+
+export interface ClosureAlternativeGroup {
+  heading: string;
+  sportLabel: string;
+  venues: {
+    name: string;
+    slug: string;
+    municipality: string;
+    count: number;
+    next: { title: string; start: string } | null;
+  }[];
 }
 
 export default function VenueScheduleClient({
@@ -27,6 +44,9 @@ export default function VenueScheduleClient({
   municipality,
   closure,
   searchName,
+  summary,
+  address,
+  alternatives = [],
 }: VenueScheduleClientProps) {
   const [activeDate, setActiveDate] = useState("");
   const [activeSport, setActiveSport] = useState("");
@@ -96,6 +116,36 @@ export default function VenueScheduleClient({
     </section>
   ) : null;
 
+  const alternativesSection = alternatives.some((group) => group.venues.length > 0) ? (
+    <section className="closure-alternatives">
+      {alternatives
+        .filter((group) => group.venues.length > 0)
+        .map((group) => (
+          <div key={group.heading} className="closure-alternatives-group">
+            <h2 className="section-title">{group.heading}</h2>
+            <ul className="closure-alternatives-list">
+              {group.venues.map((venue) => (
+                <li key={venue.slug}>
+                  <a href={`/venues/${venue.slug}`} className="closure-alternative">
+                    <span className="closure-alternative-name">{venue.name}</span>
+                    <span className="closure-alternative-meta">
+                      {venue.municipality ? `${venue.municipality} · ` : ""}
+                      {venue.count} upcoming {group.sportLabel} sessions
+                    </span>
+                    {venue.next ? (
+                      <span className="closure-alternative-next">
+                        Next: {venue.next.title}, {formatDate(venue.next.start)} at {formatTime(venue.next.start)}
+                      </span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+    </section>
+  ) : null;
+
   if (closure && events.length === 0) {
     return (
       <>
@@ -104,8 +154,13 @@ export default function VenueScheduleClient({
           <h1>
             <strong>{venueName}</strong>
           </h1>
+          <p className="hero-subtitle">
+            {venueName} is {closureHeadline(closure).toLowerCase()}, so there are no swim or fitness schedules to
+            show. Here are the closest open alternatives with current schedules.
+          </p>
         </section>
         {closureNotice}
+        {alternativesSection}
       </>
     );
   }
@@ -119,9 +174,10 @@ export default function VenueScheduleClient({
           What&apos;s on at <strong>{venueName}</strong>
         </h1>
         <p className="hero-subtitle">
-          Upcoming drop-ins, classes, swims, skates, and community activities at this venue in {municipality}, BC.
+          {summary || `Upcoming drop-ins, classes, swims, skates, and community activities at this venue in ${municipality}, BC.`}
           {searchName ? ` Also known as ${searchName}.` : null}
         </p>
+        {address ? <p className="venue-address">{address}</p> : null}
 
         <div className="status-strip status-strip-wide">
           <div className="status-card">
