@@ -7,7 +7,7 @@ import {
   EventData,
   venueSlug,
 } from "../../lib/utils";
-import { getVenueSnapshot, SITE_NAME } from "../../lib/seo";
+import { getVenueSearchName, getVenueSnapshot, SITE_NAME } from "../../lib/seo";
 import { closureHeadline, getVenueClosure } from "../../lib/closures";
 
 type Props = {
@@ -17,22 +17,26 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params;
   const venueData = getVenueSnapshot(resolvedParams.venue);
-  const displayTitle = venueData.venueName;
-  const title = `${displayTitle} | Drop-In and Recreation Schedules in ${venueData.municipality}`;
+  const searchName = getVenueSearchName(resolvedParams.venue);
+  const displayTitle = searchName ? `${venueData.venueName} (${searchName})` : venueData.venueName;
   const closure = getVenueClosure(resolvedParams.venue);
+  const title = closure
+    ? `${displayTitle} Schedule: ${closureHeadline(closure)}`
+    : `${displayTitle} Schedule | Drop-Ins in ${venueData.municipality}`;
   const description = closure
     ? `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. ${closure.summary}`
     : venueData.eventCount > 0
-      ? `See ${venueData.eventCount} upcoming activities at ${displayTitle} in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}.`
+      ? `${displayTitle} drop-in schedule: ${venueData.eventCount} upcoming activities in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}.`
       : `See upcoming drop-ins, classes, and recreation schedules at ${displayTitle} in ${venueData.municipality}, BC on ${SITE_NAME}.`;
 
   return {
     title,
     description,
     keywords: [
-      `${displayTitle} schedule`,
-      `${displayTitle} Victoria BC`,
-      `${displayTitle} drop-in`,
+      `${venueData.venueName} schedule`,
+      `${venueData.venueName} Victoria BC`,
+      `${venueData.venueName} drop-in`,
+      ...(searchName ? [`${searchName} schedule`, `${searchName} drop-in`] : []),
       `${venueData.municipality} recreation centre`,
       `${SITE_NAME} ${displayTitle}`,
     ],
@@ -65,10 +69,12 @@ export default async function VenueDetailPage({ params }: Props) {
   const closure = getVenueClosure(resolvedParams.venue);
   const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
   const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
+  const searchName = getVenueSearchName(resolvedParams.venue);
   const venueJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsActivityLocation",
     name: venueName,
+    ...(searchName ? { alternateName: searchName } : {}),
     url: `https://clubhubvictoria.ca/venues/${resolvedParams.venue}`,
     address: {
       "@type": "PostalAddress",
@@ -117,7 +123,13 @@ export default async function VenueDetailPage({ params }: Props) {
         <Link href="/venues" className="section-link" style={{ marginTop: "2rem", display: "inline-flex" }}>
           Back to venue list
         </Link>
-        <VenueScheduleClient events={events} venueName={venueName} municipality={municipality} closure={closure} />
+        <VenueScheduleClient
+          events={events}
+          venueName={venueName}
+          municipality={municipality}
+          closure={closure}
+          searchName={searchName}
+        />
       </div>
     </main>
   );

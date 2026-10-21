@@ -17,6 +17,16 @@ export type SnapshotEvent = {
 
 const events = (snapshot.events || []) as SnapshotEvent[];
 
+// Names people search for when they differ from the official venue name (from Search Console).
+const VENUE_SEARCH_NAMES: Record<string, string> = {
+  "saanich-commonwealth-place": "Commonwealth Pool",
+  "fairfield-community-place": "Fairfield Community Centre",
+};
+
+export function getVenueSearchName(slug: string): string | undefined {
+  return VENUE_SEARCH_NAMES[slug];
+}
+
 export function titleFromSlug(slug: string): string {
   return slug
     .split("-")

@@ -18,6 +18,7 @@ interface VenueScheduleClientProps {
   venueName: string;
   municipality: string;
   closure?: VenueClosure;
+  searchName?: string;
 }
 
 export default function VenueScheduleClient({
@@ -25,6 +26,7 @@ export default function VenueScheduleClient({
   venueName,
   municipality,
   closure,
+  searchName,
 }: VenueScheduleClientProps) {
   const [activeDate, setActiveDate] = useState("");
   const [activeSport, setActiveSport] = useState("");
@@ -118,6 +120,7 @@ export default function VenueScheduleClient({
         </h1>
         <p className="hero-subtitle">
           Upcoming drop-ins, classes, swims, skates, and community activities at this venue in {municipality}, BC.
+          {searchName ? ` Also known as ${searchName}.` : null}
         </p>
 
         <div className="status-strip status-strip-wide">
