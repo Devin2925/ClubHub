@@ -30,7 +30,7 @@ SCHEDULE_RANGE_RE = re.compile(
     re.I,
 )
 # Lines under a card's time that qualify it rather than start the next card.
-NOTE_LINE_RE = re.compile(rf"^(\(|no\s+session|starts?\b|ends?\b|(?:{MONTHS})[a-z]*\.?\s+\d)", re.I)
+NOTE_LINE_RE = re.compile(rf"^(\(|no\s+session|cancel+ed\b|starts?\b|ends?\b|(?:{MONTHS})[a-z]*\.?\s+\d)", re.I)
 # Cells touching within this many points belong to the same stacked card.
 STACK_GAP = 2.0
 
@@ -160,29 +160,36 @@ def read_cards(pdf_bytes: bytes, sections: list[str]) -> tuple[list[Card], str]:
             if not section or not text:
                 continue
 
-            match = TIME_RE.search(text)
-            if not match:
-                if last_card and NOTE_LINE_RE.search(text):
-                    last_card.notes = f"{last_card.notes} {text}".strip()
-                else:
-                    pending.append(text)
-                    last_card = None
+            if last_card and not pending and not TIME_RE.search(text) and NOTE_LINE_RE.search(text):
+                last_card.notes = f"{last_card.notes} {text}".strip()
                 continue
 
-            title = " ".join(pending + [text[: match.start()]]).replace("*", " ")
-            title = " ".join(title.split())
-            notes = text[match.end():].strip()
-            pending = []
-            if not title:
+            # Stacked sub-cells can split one time ("11:30am-" / "1:30pm") or hold two
+            # sessions, so read every complete time in the joined stack.
+            buffer = " ".join(pending + [text])
+            matches = list(TIME_RE.finditer(buffer))
+            if not matches:
+                pending.append(text)
                 last_card = None
                 continue
-            start_raw, start_mer, end_raw, end_mer = match.groups()
-            start = _clock(start_raw, start_mer or end_mer)
-            end = _clock(end_raw, end_mer)
-            if not start_mer and start >= end:
-                start = _clock(start_raw, "am")
-            last_card = Card(section, weekday, title, start, end, notes, match.group(0))
-            cards.append(last_card)
+
+            cursor = 0
+            for match in matches:
+                title = " ".join(buffer[cursor: match.start()].replace("*", " ").split())
+                cursor = match.end()
+                if not title:
+                    continue
+                start_raw, start_mer, end_raw, end_mer = match.groups()
+                start = _clock(start_raw, start_mer or end_mer)
+                end = _clock(end_raw, end_mer)
+                if not start_mer and start >= end:
+                    start = _clock(start_raw, "am")
+                last_card = Card(section, weekday, title, start, end, "", match.group(0))
+                cards.append(last_card)
+            pending = []
+            trailing = buffer[cursor:].strip()
+            if trailing and last_card:
+                last_card.notes = trailing
 
     return cards, page_text
 
@@ -212,7 +219,7 @@ def occurrence_dates(
     excluded = set(skip_dates)
     notes = card.notes
 
-    no_session = re.search(r"no\s+session(.*)", notes, re.I)
+    no_session = re.search(r"(?:no\s+session|cancel+ed)(.*)", notes, re.I)
     qualifiers = notes[: no_session.start()] if no_session else notes
     if no_session:
         excluded.update(_note_dates(no_session.group(1), start_date.year))
