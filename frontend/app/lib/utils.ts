@@ -99,12 +99,16 @@ export function getDateKey(isoString: string): string {
   return isoString.includes("T") ? isoString.split("T")[0] : isoString.split(" ")[0];
 }
 
-// Check if date is today
-export function isToday(dateKey: string): boolean {
-  const today = new Intl.DateTimeFormat("en-CA", {
+// Today's date key (YYYY-MM-DD) in the display time zone
+export function getTodayKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: DISPLAY_TIME_ZONE,
   }).format(new Date());
-  return dateKey === today;
+}
+
+// Check if date is today
+export function isToday(dateKey: string): boolean {
+  return dateKey === getTodayKey();
 }
 
 export function formatFreshnessLabel(freshness: string): string {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
 import { DEMO_MODE, getDemoEvents, getDemoStatus } from "./lib/demo";
-import { API_BASE, DISPLAY_TIME_ZONE, EventData, formatDateTime, formatFullDate, getDateKey, getSportMeta, venueSlug } from "./lib/utils";
+import { API_BASE, DISPLAY_TIME_ZONE, EventData, formatDateTime, formatFullDate, getDateKey, getSportMeta, getTodayKey, venueSlug } from "./lib/utils";
 import { closureHeadline, VENUE_CLOSURES } from "./lib/closures";
 
 interface StatusData {
@@ -27,6 +27,12 @@ interface StatusData {
 const INITIAL_EVENT_LIMIT = 80;
 const EVENT_LIMIT_STEP = 80;
 
+// The public site is a frozen snapshot, so hide days that have already passed.
+function dropPastDays(events: EventData[]): EventData[] {
+  const todayKey = getTodayKey();
+  return events.filter((event) => getDateKey(event.start_time) >= todayKey);
+}
+
 export default function HomePage() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -36,14 +42,15 @@ export default function HomePage() {
 
   const [activeMunicipality, setActiveMunicipality] = useState("");
   const [activeVenue, setActiveVenue] = useState("");
-  const [activeDate, setActiveDate] = useState("");
+  // null = default to today (or the next day with activities); "" = All Dates
+  const [dateSelection, setDateSelection] = useState<string | null>(null);
   const [activeSport, setActiveSport] = useState("");
   const [visibleEventLimit, setVisibleEventLimit] = useState(INITIAL_EVENT_LIMIT);
   const feedbackEmail = "clubhubvictoria@gmail.com";
 
   async function refreshData() {
     if (DEMO_MODE) {
-      setEvents(getDemoEvents());
+      setEvents(dropPastDays(getDemoEvents()));
       setStatus(getDemoStatus());
       return;
     }
@@ -55,7 +62,7 @@ export default function HomePage() {
     const eventsData = await eventsRes.json();
     const statusData = await statusRes.json();
 
-    setEvents(eventsData.events || []);
+    setEvents(dropPastDays(eventsData.events || []));
     setStatus(statusData || null);
   }
 
@@ -120,6 +127,9 @@ export default function HomePage() {
     return Array.from(new Set(filtered.map((event) => getDateKey(event.start_time)))).sort().slice(0, 21);
   }, [events, activeMunicipality, activeVenue]);
 
+  const todayKey = getTodayKey();
+  const activeDate = dateSelection ?? (dates.includes(todayKey) ? todayKey : dates[0] || "");
+
   const availableSports = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of events) {
@@ -158,12 +168,12 @@ export default function HomePage() {
 
   useEffect(() => {
     setActiveVenue("");
-    setActiveDate("");
+    setDateSelection(null);
     setActiveSport("");
   }, [activeMunicipality]);
 
   useEffect(() => {
-    setActiveDate("");
+    setDateSelection(null);
     setActiveSport("");
   }, [activeVenue]);
 
@@ -316,7 +326,7 @@ export default function HomePage() {
             <div className="horizontal-scroller full-width-scroller">
               <button
                 className={`chip ${activeDate === "" ? "active" : ""}`}
-                onClick={() => setActiveDate("")}
+                onClick={() => setDateSelection("")}
                 type="button"
               >
                 All Dates
@@ -325,7 +335,7 @@ export default function HomePage() {
                 <button
                   key={date}
                   className={`chip ${activeDate === date ? "active" : ""}`}
-                  onClick={() => setActiveDate(date)}
+                  onClick={() => setDateSelection(date)}
                   type="button"
                 >
                   {formatFullDate(`${date}T00:00:00`).replace(", 2026", "")}
