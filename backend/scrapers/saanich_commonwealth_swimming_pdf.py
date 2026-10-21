@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta
 from io import BytesIO
 from urllib.parse import urljoin
 
+import pdfplumber
 import requests
-from pypdf import PdfReader
 
 from models import Event, SessionLocal
 from scrapers.base import BaseScraper, strip_html
@@ -14,10 +14,6 @@ from scrapers.base import BaseScraper, strip_html
 PAGE_URL = "https://www.saanich.ca/EN/main/parks-recreation-community/recreation/schedules/swimming.html"
 VENUE_NAME = "Saanich Commonwealth Place"
 DAY_ORDER = ["MON", "TUES", "WED", "THURS", "FRI", "SAT", "SUN"]
-TIME_RANGE_RE = re.compile(
-    r"\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*-\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)",
-    re.I,
-)
 MONTHS = (
     "January|February|March|April|May|June|July|August|September|October|November|December"
 )
@@ -51,17 +47,17 @@ WEEK_WINDOW_RE = re.compile(
     rf"({MONTHS}|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+(\d{{1,2}})\s*[-–]\s*(?:({MONTHS}|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+)?(\d{{1,2}})",
     re.I,
 )
-# Everything after any of these markers is legend/description text, not schedule grid.
-STOP_RE = re.compile(
-    r"(All times subject to change|Swim Descriptions|No Lengths Available)", re.I
+# A start time may omit am/pm ("10:15-3:30pm"); asterisks mark lane counts or cell notes.
+TIME_RE = re.compile(
+    r"(\*{0,2})\s*(\d{1,2}(?::\d{2})?)\s*(am|pm)?\s*[-–]\s*(\d{1,2}(?::\d{2})?)\s*(am|pm)\s*(\*{0,2})",
+    re.I,
 )
+# Rows at or below these labels are legend text, not schedule grid.
+STOP_RE = re.compile(r"Swim\s+Descriptions|No\s+Lengths\s+Available", re.I)
 
-# The two leading grid rows are not published as activities, but they must stay in the
-# row sequence so the schedule grid stays aligned while rows are consumed in order.
-LEAD_ROWS = [
-    ("Pool Hours", r"Pool\s+Hours"),
-    ("Special Notes", r"Special\s+Notes"),
-]
+# Grid rows that are not published as activities.
+SKIPPED_ROWS_RE = re.compile(r"Special\s+Notes", re.I)
+
 SWIM_ROWS = [
     ("Leisure Swims", r"Leisure\s+Swims"),
     ("Fun Swims", r"Fun\s+Swims"),
@@ -69,24 +65,28 @@ SWIM_ROWS = [
     ("Water Slide", r"Water\s+Slide"),
     ("Lessons & Leisure", r"Lessons\s*&\s*Leisure"),
 ]
+# Order matters: "Teach Pool Lengths" must not be taken for a shared walking row.
 LENGTH_ROWS = [
-    ("25m Short Course Lengths", r"25\s*M\s+Short\s+Course"),
-    ("50m Long Course Lengths", r"50\s*M\s+Long\s+Course"),
-    ("Teach Pool Lengths", r"Teach\s+Pool\s+Lengths"),
+    ("25m Short Course Lengths", r"25\s*m\s+Short\s+Course"),
+    ("50m Long Course Lengths", r"50\s*m\s+Long\s+Course"),
     ("Shallow Water Walking", r"Shallow\s+Water\s+Walking"),
-    ("Dive Tank Lengths", r"Dive\s+Tank\s+Lengths"),
     ("Deep Water Walking", r"Deep\s+Water\s+Walking"),
+    ("Teach Pool Lengths", r"Teach\s+Pool"),
+    ("Dive Tank Lengths", r"Dive\s+Tank"),
 ]
 SCHEDULE_KINDS = {
     "swim": {
         "rows": SWIM_ROWS,
-        "description": "Saanich Commonwealth public swim schedule PDF.",
+        "description": "Public swim session from the Saanich Commonwealth Place weekly swim schedule.",
     },
     "lengths": {
         "rows": LENGTH_ROWS,
-        "description": "Saanich Commonwealth public lengths schedule PDF.",
+        "description": "Lane swimming from the Saanich Commonwealth Place weekly lengths schedule.",
     },
 }
+LANE_NOTES = {"*": "1-2 lanes", "**": "3-4 lanes", "": "5+ lanes"}
+# Leaves room for doubled rules and small gaps where a ruling line is drawn in segments.
+FULL_RULE_COVERAGE = 0.9
 
 
 class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
@@ -128,15 +128,40 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
             return start, end
         return None
 
-    def _read_pdf(self, pdf_url: str) -> tuple[str, str]:
-        """Return (reading-order text, layout-preserving text) for page 1."""
+    def _read_pdf(self, pdf_url: str) -> dict:
+        """Return page 1's plain text, positioned words, and full-width ruling lines."""
         response = self.session.get(pdf_url, timeout=30)
         response.raise_for_status()
-        page = PdfReader(BytesIO(response.content)).pages[0]
-        return (
-            page.extract_text() or "",
-            page.extract_text(extraction_mode="layout") or "",
-        )
+        with pdfplumber.open(BytesIO(response.content)) as pdf:
+            page = pdf.pages[0]
+            return {
+                "text": page.extract_text() or "",
+                "words": page.extract_words(x_tolerance=1.5, y_tolerance=2),
+                "rules": self._full_width_rules(page),
+            }
+
+    @staticmethod
+    def _full_width_rules(page) -> list[float]:
+        """Y positions of horizontal lines spanning the table, which separate grid rows."""
+        segments: dict[int, list[tuple[float, float]]] = {}
+        for edge in page.horizontal_edges:
+            segments.setdefault(round(edge["top"]), []).append((edge["x0"], edge["x1"]))
+        spans = {y: (min(a for a, _ in segs), max(b for _, b in segs)) for y, segs in segments.items()}
+        table_left = min(left for left, _ in spans.values())
+        table_right = max(right for _, right in spans.values())
+        width = table_right - table_left
+
+        rules = []
+        for y, segs in segments.items():
+            covered, reach = 0.0, table_left
+            for start, end in sorted(segs):
+                start = max(start, reach)
+                if end > start:
+                    covered += end - start
+                    reach = end
+            if covered >= width * FULL_RULE_COVERAGE:
+                rules.append(float(y))
+        return sorted(rules)
 
     def _classify(self, plain_text: str) -> str | None:
         """Identify the schedule type from the PDF's own heading, not its filename."""
@@ -165,250 +190,205 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
             end = end.replace(year=end.year + 1)
         return start, end
 
-    def _day_dates(self, layout_text: str, week_start: date, pdf_url: str) -> dict[str, date]:
-        """Map each day column to a real date, verified against the header day numbers."""
-        header = self._header_line(layout_text, pdf_url)
-        dates: dict[str, date] = {}
-        for index, day in enumerate(DAY_ORDER):
-            match = re.search(rf"\b{day}\s+(\d{{1,2}})\b", header)
-            if not match:
-                raise ValueError(f"Missing {day} column in {pdf_url}")
-            event_date = week_start + timedelta(days=index)
-            if event_date.day != int(match.group(1)):
-                raise ValueError(
-                    f"Day column {day} {match.group(1)} does not match "
-                    f"expected {event_date.isoformat()} in {pdf_url}"
-                )
-            dates[day] = event_date
-        return dates
+    def _day_columns(self, words: list[dict], week_start: date, pdf_url: str):
+        """Locate the day header, verify its day numbers, and return per-day column bounds."""
+        by_line: dict[int, list[dict]] = {}
+        for word in words:
+            by_line.setdefault(round(word["top"]), []).append(word)
 
-    def _header_line(self, layout_text: str, pdf_url: str) -> str:
-        for line in layout_text.splitlines():
-            if re.search(r"\bMON\s+\d", line) and re.search(r"\bSUN\s+\d", line):
-                return line
+        for line in by_line.values():
+            line = sorted(line, key=lambda w: w["x0"])
+            texts = [w["text"].upper() for w in line]
+            if "MON" not in texts or "SUN" not in texts:
+                continue
+            centers, dates = [], {}
+            for index, day in enumerate(DAY_ORDER):
+                if day not in texts:
+                    raise ValueError(f"Missing {day} column in {pdf_url}")
+                position = texts.index(day)
+                number_word = line[position + 1] if position + 1 < len(line) else None
+                expected = week_start + timedelta(days=index)
+                if not number_word or number_word["text"] != str(expected.day):
+                    raise ValueError(
+                        f"Day column {day} does not match expected {expected.isoformat()} in {pdf_url}"
+                    )
+                dates[day] = expected
+                centers.append((line[position]["x0"] + number_word["x1"]) / 2)
+
+            gaps = [b - a for a, b in zip(centers, centers[1:])]
+            bounds = [centers[0] - gaps[0] / 2]
+            bounds += [(a + b) / 2 for a, b in zip(centers, centers[1:])]
+            bounds.append(centers[-1] + gaps[-1] / 2)
+            return dates, bounds, line[0]["bottom"]
+
         raise ValueError(f"Could not locate day header row in {pdf_url}")
 
-    def _row_sequence(self, plain_text: str, rows: list[tuple[str, str]]) -> list[tuple[str, list[str]]]:
-        """Ordered (title, times) straight from reading order, which never mixes rows up."""
-        flat = re.sub(r"[ \t]+", " ", plain_text)
-        marks = []
+    @staticmethod
+    def _column_for(word: dict, bounds: list[float]) -> int | None:
+        center = (word["x0"] + word["x1"]) / 2
+        for index in range(len(bounds) - 1):
+            if bounds[index] <= center < bounds[index + 1]:
+                return index
+        return None
+
+    def _pool_hours_line(self, words: list[dict], bounds: list[float], header_bottom: float):
+        """The first line under the day header holds one opening-hours range per day."""
+        lines: dict[int, list[dict]] = {}
+        for word in words:
+            if word["top"] >= header_bottom - 1:
+                lines.setdefault(round(word["top"]), []).append(word)
+        for top in sorted(lines):
+            line = [w for w in lines[top] if TIME_RE.fullmatch(w["text"].strip())]
+            if len(line) < len(DAY_ORDER) - 2:
+                continue
+            hours = {}
+            for word in line:
+                column = self._column_for(word, bounds)
+                if column is not None:
+                    hours[column] = self._pool_hours(word["text"])
+            return hours, {id(w) for w in line}
+        return {}, set()
+
+    def _grid_cells(self, pdf: dict, bounds: list[float], header_bottom: float, pdf_url: str, skip_ids=frozenset()):
+        """Yield (row label, {day index: cell text}) for each ruled row below the header."""
+        rules = [y for y in pdf["rules"] if y >= header_bottom - 1]
+        if len(rules) < 2:
+            raise ValueError(f"Could not find ruled grid rows in {pdf_url}")
+
+        for top, bottom in zip(rules, rules[1:]):
+            band = [
+                w for w in pdf["words"]
+                if top <= (w["top"] + w["bottom"]) / 2 < bottom and id(w) not in skip_ids
+            ]
+            if not band:
+                continue
+            band.sort(key=lambda w: (round(w["top"]), w["x0"]))
+            label = " ".join(w["text"] for w in band if w["x1"] <= bounds[0] + 2)
+            if STOP_RE.search(label):
+                return
+            cells: dict[int, list[str]] = {}
+            for word in band:
+                if word["x1"] <= bounds[0] + 2:
+                    continue
+                column = self._column_for(word, bounds)
+                if column is None:
+                    continue
+                cells.setdefault(column, []).append(word["text"])
+            yield label, {day: " ".join(parts) for day, parts in cells.items()}
+
+    def _match_row(self, label: str, rows: list[tuple[str, str]]) -> str | None:
         for title, pattern in rows:
-            match = re.search(pattern, flat, re.I)
-            if match:
-                marks.append((match.start(), match.end(), title))
-        if not marks:
-            return []
-        marks.sort()
-
-        stop = STOP_RE.search(flat, marks[0][0])
-        hard_stop = stop.start() if stop else len(flat)
-
-        sequence = []
-        for index, (_, label_end, title) in enumerate(marks):
-            end = marks[index + 1][0] if index + 1 < len(marks) else hard_stop
-            end = min(end, hard_stop)
-            segment = flat[label_end:end] if label_end < end else ""
-            sequence.append(
-                (title, [self._normalize(v) for v in TIME_RANGE_RE.findall(segment)])
-            )
-        return sequence
-
-    def _grid_lines(self, layout_text: str, pdf_url: str) -> list[dict[str, list[str]]]:
-        """Per-line day cells, using the day header to fix column boundaries."""
-        lines = layout_text.splitlines()
-        header = self._header_line(layout_text, pdf_url)
-        header_index = lines.index(header)
-
-        starts = []
-        for day in DAY_ORDER:
-            match = re.search(rf"\b{day}\s+\d{{1,2}}\b", header)
-            starts.append(match.start())
-        bounds = [0]
-        for index in range(len(starts) - 1):
-            bounds.append((starts[index] + starts[index + 1]) // 2)
-        bounds.append(len(header) + 10_000)
-
-        grid = []
-        for line in lines[header_index + 1 :]:
-            if STOP_RE.search(line):
-                break
-            cells = {}
-            for index, day in enumerate(DAY_ORDER):
-                segment = line[bounds[index] : bounds[index + 1]]
-                found = [self._normalize(v) for v in TIME_RANGE_RE.findall(segment)]
-                if found:
-                    cells[day] = found
-            if cells:
-                grid.append(cells)
-        return grid
-
-    def _assign_rows(
-        self,
-        sequence: list[tuple[str, list[str]]],
-        grid: list[dict[str, list[str]]],
-        pdf_url: str,
-    ) -> dict[str, dict[str, list[str]]]:
-        """Walk grid lines in order, consuming each row's known time count.
-
-        Reading order fixes which row a time belongs to and the grid fixes which day,
-        so a layout change that breaks the pairing raises instead of publishing
-        times under the wrong pool or the wrong day.
-        """
-        assigned: dict[str, dict[str, list[str]]] = {title: {} for title, _ in sequence}
-        row_index = 0
-        remaining = list(sequence[0][1]) if sequence else []
-
-        for cells in grid:
-            count = sum(len(values) for values in cells.values())
-            while row_index < len(sequence) and not remaining:
-                row_index += 1
-                if row_index < len(sequence):
-                    remaining = list(sequence[row_index][1])
-            if row_index >= len(sequence):
-                raise ValueError(f"Schedule grid has more rows than expected in {pdf_url}")
-            if count > len(remaining):
-                raise ValueError(
-                    f"Row '{sequence[row_index][0]}' expected {len(remaining)} more times "
-                    f"but grid line holds {count} in {pdf_url}"
-                )
-            title = sequence[row_index][0]
-            for day, values in cells.items():
-                assigned[title].setdefault(day, []).extend(values)
-            del remaining[:count]
-
-        for title, expected in sequence:
-            mapped = sum(len(values) for values in assigned[title].values())
-            if mapped != len(expected):
-                raise ValueError(
-                    f"Row '{title}' mapped {mapped} of {len(expected)} times in {pdf_url}"
-                )
-        return assigned
+            if re.search(pattern, label, re.I):
+                return title
+        return None
 
     @staticmethod
-    def _normalize(value: str) -> str:
-        return re.sub(r"\s+", "", value).lower()
+    def _clock(value: str, meridiem: str) -> datetime:
+        if ":" not in value:
+            value = f"{value}:00"
+        return datetime.strptime(f"{value}{meridiem.lower()}", "%I:%M%p")
 
-    def _parse_time_range(self, value: str) -> tuple[str, str]:
-        compact = value.replace(" ", "").lower()
-        start_raw, end_raw = compact.split("-", 1)
-        start_match = re.fullmatch(r"(\d{1,2}(?::\d{2})?)(am|pm)", start_raw)
-        end_match = re.fullmatch(r"(\d{1,2}(?::\d{2})?)(am|pm)", end_raw)
-        if not start_match or not end_match:
-            raise ValueError(f"Unparseable time range: {value}")
-        start_clock, start_meridiem = start_match.groups()
-        end_clock, end_meridiem = end_match.groups()
-        if ":" not in start_clock:
-            start_clock = f"{start_clock}:00"
-        if ":" not in end_clock:
-            end_clock = f"{end_clock}:00"
-        return f"{start_clock}{start_meridiem}", f"{end_clock}{end_meridiem}"
+    def _resolve_times(self, start_raw, start_mer, end_raw, end_mer, hours):
+        """Resolve a range to clock times, fixing a missing or mistyped meridiem
+        against the day's pool hours (e.g. "3:30-9am" between afternoon slots)."""
+        candidates = []
+        if start_mer:
+            candidates.append((start_mer, end_mer))
+        else:
+            candidates += [(end_mer, end_mer), ("am", end_mer)]
+        candidates.append(("pm", "pm"))
 
-    def _existing_keys(self, start_date: date, end_date: date) -> set[tuple[str, str, str]]:
+        for s_mer, e_mer in candidates:
+            start = self._clock(start_raw, s_mer)
+            end = self._clock(end_raw, e_mer)
+            if end <= start:
+                continue
+            if hours and not (hours[0] <= start.time() and end.time() <= hours[1]):
+                continue
+            return start.time(), end.time()
+        return None
+
+    def _pool_hours(self, cell: str):
+        match = TIME_RE.search(cell or "")
+        if not match:
+            return None
+        _, start_raw, start_mer, end_raw, end_mer, _ = match.groups()
+        start = self._clock(start_raw, start_mer or end_mer)
+        end = self._clock(end_raw, end_mer)
+        return (start.time(), end.time()) if end > start else None
+
+    def _sessions_from_pdf(self, pdf: dict, kind: str, week_start: date, pdf_url: str):
+        config = SCHEDULE_KINDS[kind]
+        day_dates, bounds, header_bottom = self._day_columns(pdf["words"], week_start, pdf_url)
+        pool_hours, pool_hour_ids = self._pool_hours_line(pdf["words"], bounds, header_bottom)
+        if not pool_hours:
+            raise ValueError(f"Could not find pool hours under the day header in {pdf_url}")
+        sessions = []
+        matched_rows = set()
+
+        for label, cells in self._grid_cells(pdf, bounds, header_bottom, pdf_url, pool_hour_ids):
+            if SKIPPED_ROWS_RE.search(label):
+                continue
+            has_times = any(TIME_RE.search(text) for text in cells.values())
+            if not has_times:
+                continue
+            title = self._match_row(label, config["rows"])
+            if not title:
+                if has_times:
+                    raise ValueError(f"Unrecognized schedule row '{label}' in {pdf_url}")
+                continue
+            matched_rows.add(title)
+
+            for day_index, text in cells.items():
+                event_date = day_dates[DAY_ORDER[day_index]]
+                notes = " ".join(TIME_RE.sub(" ", text).replace("*", " ").split())
+                for match in TIME_RE.finditer(text):
+                    lead, start_raw, start_mer, end_raw, end_mer, trail = match.groups()
+                    marker = lead or trail
+                    if kind == "swim" and marker and re.search(r"no\s+leisure\s+space", notes, re.I):
+                        continue
+                    resolved = self._resolve_times(
+                        start_raw, start_mer, end_raw, end_mer, pool_hours.get(day_index)
+                    )
+                    if not resolved:
+                        print(
+                            f"[{self.municipality}] Skipping unreadable time '{match.group(0).strip()}' "
+                            f"for {title} on {event_date.isoformat()}"
+                        )
+                        continue
+                    description = config["description"]
+                    if kind == "lengths":
+                        description = f"{description} {LANE_NOTES.get(marker, '5+ lanes')} available."
+                    elif marker and notes:
+                        description = f"{notes}. {description}"
+                    sessions.append(
+                        {
+                            "title": title,
+                            "start": datetime.combine(event_date, resolved[0]),
+                            "end": datetime.combine(event_date, resolved[1]),
+                            "description": description,
+                        }
+                    )
+
+        if not matched_rows:
+            raise ValueError(f"No known schedule rows found in {pdf_url}")
+        return sessions
+
+    def _other_source_keys(self, start_date: date, end_date: date) -> set[tuple[str, datetime]]:
+        """Sessions already published by another source (Active Communities) for this venue."""
         db = SessionLocal()
         try:
             rows = (
                 db.query(Event)
                 .filter(Event.venue_name == self.venue_name)
+                .filter(Event.source != self.source_id_prefix)
                 .filter(Event.start_time >= datetime.combine(start_date, datetime.min.time()))
                 .filter(Event.start_time < datetime.combine(end_date + timedelta(days=1), datetime.min.time()))
                 .all()
             )
-            return {
-                (
-                    row.venue_name,
-                    row.title,
-                    row.start_time.replace(microsecond=0).isoformat(sep=" "),
-                )
-                for row in rows
-            }
+            return {(row.title, row.start_time.replace(microsecond=0)) for row in rows}
         finally:
             db.close()
-
-    def _append_missing_event(
-        self,
-        events: list[dict],
-        existing_keys: set[tuple[str, str, str]],
-        reported_keys: set[tuple[str, str, str]],
-        *,
-        title: str,
-        start_dt: datetime,
-        end_dt: datetime,
-        pdf_url: str,
-        description: str,
-    ):
-        existing_key = (
-            self.venue_name,
-            title,
-            start_dt.replace(microsecond=0).isoformat(sep=" "),
-        )
-        reported_keys.add(existing_key)
-        if existing_key in existing_keys:
-            return
-
-        source_key = f"{self.venue_name}|{title}|{start_dt.isoformat()}|{pdf_url}"
-        source_hash = hashlib.md5(source_key.encode("utf-8")).hexdigest()[:16]
-        events.append(
-            {
-                "source_id": f"{self.source_id_prefix}_{source_hash}",
-                "title": title,
-                "venue_name": self.venue_name,
-                "facility_name": "Pool",
-                "start_time": start_dt,
-                "end_time": end_dt,
-                "price": "",
-                "description": description,
-                "booking_url": pdf_url,
-            }
-        )
-        existing_keys.add(existing_key)
-
-    def _events_from_pdf(
-        self,
-        pdf_url: str,
-        kind: str,
-        plain_text: str,
-        layout_text: str,
-        week_start: date,
-        events: list[dict],
-        existing_keys: set[tuple[str, str, str]],
-        reported_keys: set[tuple[str, str, str]],
-    ):
-        config = SCHEDULE_KINDS[kind]
-        day_dates = self._day_dates(layout_text, week_start, pdf_url)
-        sequence = self._row_sequence(plain_text, LEAD_ROWS + config["rows"])
-        publishable = {title for title, _ in config["rows"]}
-        if not any(title in publishable for title, _ in sequence):
-            raise ValueError(f"No known schedule rows found in {pdf_url}")
-
-        grid = self._grid_lines(layout_text, pdf_url)
-        assigned = self._assign_rows(sequence, grid, pdf_url)
-        today = date.today()
-
-        for title in (row_title for row_title, _ in config["rows"]):
-            for day, values in assigned.get(title, {}).items():
-                event_date = day_dates[day]
-                if event_date < today:
-                    continue
-                for value in values:
-                    start_raw, end_raw = self._parse_time_range(value)
-                    start_dt = datetime.strptime(
-                        f"{event_date.isoformat()} {start_raw}", "%Y-%m-%d %I:%M%p"
-                    )
-                    end_dt = datetime.strptime(
-                        f"{event_date.isoformat()} {end_raw}", "%Y-%m-%d %I:%M%p"
-                    )
-                    if end_dt <= start_dt:
-                        end_dt += timedelta(days=1)
-                    self._append_missing_event(
-                        events,
-                        existing_keys,
-                        reported_keys,
-                        title=title,
-                        start_dt=start_dt,
-                        end_dt=end_dt,
-                        pdf_url=pdf_url,
-                        description=config["description"],
-                    )
 
     def scrape(self):
         print(f"[{self.municipality}] Starting Commonwealth swimming PDF scrape...")
@@ -416,21 +396,21 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
         schedules = []
         for pdf_url in self._candidate_pdf_urls():
             try:
-                plain_text, layout_text = self._read_pdf(pdf_url)
+                pdf = self._read_pdf(pdf_url)
             except Exception as exc:
                 print(f"[{self.municipality}] Could not read {pdf_url}: {exc}")
                 continue
-            kind = self._classify(plain_text)
+            kind = self._classify(pdf["text"])
             if not kind:
                 continue
             try:
-                week_start, week_end = self._parse_week_window(plain_text, pdf_url)
+                week_start, week_end = self._parse_week_window(pdf["text"], pdf_url)
             except ValueError as exc:
                 print(f"[{self.municipality}] {exc}")
                 continue
             if week_end < today:
                 continue
-            schedules.append((pdf_url, kind, plain_text, layout_text, week_start, week_end))
+            schedules.append((pdf_url, kind, pdf, week_start, week_end))
 
         if not schedules:
             closure = self._current_closure_window()
@@ -448,38 +428,54 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
                 return []
             raise ValueError("Could not find current Commonwealth swimming PDFs")
 
-        start_date = min(item[4] for item in schedules)
-        end_date = max(item[5] for item in schedules)
-        existing_keys = self._existing_keys(start_date, end_date)
+        start_date = min(item[3] for item in schedules)
+        end_date = max(item[4] for item in schedules)
+        other_keys = self._other_source_keys(start_date, end_date)
 
         events: list[dict] = []
-        reported_keys: set[tuple[str, str, str]] = set()
+        seen: set[tuple[str, datetime]] = set()
         failures = []
-        for pdf_url, kind, plain_text, layout_text, week_start, _ in schedules:
+        for pdf_url, kind, pdf, week_start, _ in schedules:
             try:
-                self._events_from_pdf(
-                    pdf_url,
-                    kind,
-                    plain_text,
-                    layout_text,
-                    week_start,
-                    events,
-                    existing_keys,
-                    reported_keys,
-                )
+                sessions = self._sessions_from_pdf(pdf, kind, week_start, pdf_url)
             except ValueError as exc:
                 failures.append(str(exc))
                 print(f"[{self.municipality}] Skipping schedule: {exc}")
+                continue
+            for session in sessions:
+                if session["start"].date() < today:
+                    continue
+                key = (session["title"], session["start"])
+                if key in seen or key in other_keys:
+                    continue
+                seen.add(key)
+                source_key = f"{self.venue_name}|{session['title']}|{session['start'].isoformat()}"
+                source_hash = hashlib.md5(source_key.encode("utf-8")).hexdigest()[:16]
+                events.append(
+                    {
+                        "source_id": f"{self.source_id_prefix}_{source_hash}",
+                        "title": session["title"],
+                        "venue_name": self.venue_name,
+                        "facility_name": "Pool",
+                        "start_time": session["start"],
+                        "end_time": session["end"],
+                        "price": "",
+                        "description": session["description"],
+                        "booking_url": pdf_url,
+                    }
+                )
 
-        if not reported_keys:
+        if not events:
             raise ValueError(
                 "Commonwealth swimming PDFs produced no rows: " + "; ".join(failures)
             )
 
-        self.last_reported_count = len(reported_keys)
+        self.last_reported_count = len(events)
         print(
-            f"[{self.municipality}] Commonwealth swimming PDF recognized {self.last_reported_count} rows, "
-            f"adding {len(events)} missing events."
+            f"[{self.municipality}] Commonwealth swimming PDF parsed {len(events)} sessions "
+            f"from {len(schedules) - len(failures)} of {len(schedules)} schedules."
         )
+        # Each run republishes the current weekly PDFs in full, so stale sessions drop out.
+        self.replace_existing_events()
         self.save_events(events)
         return events

@@ -1,23 +1,20 @@
 import hashlib
 import re
-from datetime import date, datetime, timedelta
-from io import BytesIO
+from datetime import datetime
 
 import requests
-from pypdf import PdfReader
 
 from scrapers.base import BaseScraper, classify_sport
+from scrapers.oakbay_grid import bc_statutory_holidays, occurrence_dates, read_cards, schedule_range
 
 
 DROPIN_PAGE_URL = "https://www.oakbay.ca/parks-recreation/programs-registration-services/drop-in-schedules/"
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-DAY_TO_INDEX = {day: index for index, day in enumerate(DAY_NAMES)}
-SECTION_VENUES = {
-    "Henderson Recreation Centre": "Henderson Recreation Centre",
-    "Neighbourhood Learning Centre": "Neighbourhood Learning Centre",
-    "Oak Bay Indoor Sports Field": "Oak Bay Indoor Sports Field",
-    "Monterey Recreation Centre": "Monterey Recreation Centre",
-}
+SECTIONS = [
+    "Henderson Recreation Centre",
+    "Neighbourhood Learning Centre",
+    "Oak Bay Indoor Sports Field",
+    "Monterey Recreation Centre",
+]
 
 
 class OakBayGroupFitnessPDFScraper(BaseScraper):
@@ -32,224 +29,63 @@ class OakBayGroupFitnessPDFScraper(BaseScraper):
         matches = re.findall(r'https://www\.oakbay\.ca/wp-content/uploads/[^"\']+Fitness-Drop-in-Schedule[^"\']+\.pdf', response.text, re.I)
         if not matches:
             raise ValueError("Could not find Oak Bay group fitness PDF")
-        return matches[0]
+        # Uploads are filed by year/month, so the latest path is the current schedule.
+        return sorted(set(matches))[-1]
 
-    def _fetch_layout_text(self, pdf_url: str) -> str:
-        response = self.session.get(pdf_url, timeout=30)
-        response.raise_for_status()
-        reader = PdfReader(BytesIO(response.content))
-        return reader.pages[0].extract_text(extraction_mode="layout") or ""
-
-    def _parse_date_range(self, layout_text: str) -> tuple[date, date]:
-        match = re.search(
-            r"\((\w+)\s+(\d+)(?:st|nd|rd|th)\s+–\s+(\w+)\s+(\d+)(?:st|nd|rd|th),\s+(\d{4})\)",
-            layout_text,
-        )
-        if not match:
-            raise ValueError("Could not parse Oak Bay group fitness PDF date range")
-        start_month, start_day, end_month, end_day, year = match.groups()
-        start_date = datetime.strptime(
-            f"{start_month} {start_day} {year}",
-            "%B %d %Y",
-        ).date()
-        end_date = datetime.strptime(
-            f"{end_month} {end_day} {year}",
-            "%B %d %Y",
-        ).date()
-        return start_date, end_date
-
-    def _day_boundaries(self, header_line: str, max_width: int = 0) -> list[int]:
-        # Split on the midpoint between column centres. Splitting on the midpoint
-        # between the header word starts drifts right of the real column edge and
-        # slices characters off the neighbouring cell.
-        centres = []
-        for day in DAY_NAMES:
-            try:
-                start = header_line.index(day)
-                width = len(day)
-            except ValueError:
-                pattern = r"\s*".join(re.escape(char) for char in day)
-                match = re.search(pattern, header_line, re.I)
-                if not match:
-                    raise
-                start = match.start()
-                width = match.end() - match.start()
-            centres.append(start + width / 2)
-        boundaries = [0]
-        for idx in range(len(centres) - 1):
-            boundaries.append(int((centres[idx] + centres[idx + 1]) // 2))
-        boundaries.append(max(max_width, len(header_line)) + 1)
-        return boundaries
-
-    def _extract_sections(self, layout_text: str) -> dict[str, dict[str, list[str]]]:
-        lines = layout_text.splitlines()
-        header_index = next(i for i, line in enumerate(lines) if "Monday" in line and "Sunday" in line)
-        boundaries = self._day_boundaries(
-            lines[header_index], max(len(line) for line in lines)
-        )
-
-        sections = {
-            venue_name: {day: [] for day in DAY_NAMES}
-            for venue_name in SECTION_VENUES.values()
-        }
-        current_section = "Henderson Recreation Centre"
-
-        for raw_line in lines[header_index + 1 :]:
-            line = raw_line.rstrip()
-            compact = " ".join(line.split())
-            if not compact:
-                continue
-            if compact.startswith("How to Register Online for Fitness Classes"):
-                break
-            if compact in SECTION_VENUES:
-                current_section = SECTION_VENUES[compact]
-                continue
-
-            for idx, day in enumerate(DAY_NAMES):
-                segment = raw_line[boundaries[idx] : boundaries[idx + 1]].strip()
-                if segment:
-                    sections[current_section][day].append(segment)
-
-        return sections
-
-    def _is_time_line(self, line: str) -> bool:
-        compact = line.replace(" ", "")
-        return bool(re.search(r"\d{1,2}:\d{2}(am|pm)?-\d{1,2}:\d{2}(am|pm)", compact, re.I))
-
-    def _is_note_line(self, line: str) -> bool:
-        lowered = line.lower()
-        return (
-            line.startswith("*")
-            or line.startswith("Note:")
-            or "statutory holidays" in lowered
-            or "pre-registration" in lowered
-            or "remains open for drop-in users" in lowered
-            or "during circuit training" in lowered
-        )
-
-    def _parse_time_range(self, raw: str) -> tuple[str, str]:
-        compact = raw.replace(" ", "").replace("*", "").lower()
-        start_raw, end_raw = compact.split("-", 1)
-
-        end_match = re.match(r"(\d{1,2}:\d{2})(am|pm)", end_raw)
-        if not end_match:
-            raise ValueError(f"Unparseable end time: {raw}")
-        end_clock, end_meridiem = end_match.groups()
-
-        start_match = re.match(r"(\d{1,2}:\d{2})(am|pm)?", start_raw)
-        if not start_match:
-            raise ValueError(f"Unparseable start time: {raw}")
-        start_clock, start_meridiem = start_match.groups()
-        if not start_meridiem:
-            start_meridiem = end_meridiem
-
-        return f"{start_clock}{start_meridiem}", f"{end_clock}{end_meridiem}"
-
-    def _parse_day_events(self, lines: list[str]) -> list[dict]:
-        events = []
-        title_lines: list[str] = []
-
-        for raw_line in lines:
-            line = " ".join(raw_line.split())
-            if not line:
-                continue
-
-            if self._is_note_line(line):
-                if events and not title_lines:
-                    events[-1]["note"] = f"{events[-1]['note']} {line}".strip()
-                else:
-                    title_lines.append(line)
-                continue
-
-            if self._is_time_line(line):
-                if not title_lines:
-                    continue
-                title = " ".join(title_lines).strip()
-                start_time, end_time = self._parse_time_range(line)
-                events.append(
-                    {
-                        "title": title,
-                        "start_time_str": start_time,
-                        "end_time_str": end_time,
-                        "note": "",
-                    }
-                )
-                title_lines = []
-                continue
-
-            title_lines.append(line)
-
-        return events
-
-    def _build_occurrences(self, venue_name: str, weekday: str, events: list[dict], start_date: date, end_date: date, pdf_url: str) -> list[dict]:
-        weekday_index = DAY_TO_INDEX[weekday]
-        current = max(datetime.utcnow().date(), start_date)
-        occurrences = []
-
-        while current <= end_date:
-            if current.weekday() == weekday_index:
-                for event in events:
-                    start_dt = datetime.strptime(
-                        f"{current.isoformat()} {event['start_time_str']}",
-                        "%Y-%m-%d %I:%M%p",
-                    )
-                    end_dt = datetime.strptime(
-                        f"{current.isoformat()} {event['end_time_str']}",
-                        "%Y-%m-%d %I:%M%p",
-                    )
-                    if end_dt <= start_dt:
-                        end_dt += timedelta(days=1)
-
-                    source_key = f"{venue_name}|{event['title']}|{start_dt.isoformat()}"
-                    source_hash = hashlib.md5(source_key.encode("utf-8")).hexdigest()[:16]
-                    description = "Oak Bay Group Fitness Drop-In PDF schedule."
-                    if venue_name == "Monterey Recreation Centre":
-                        description += " Note: drop-in programs at Monterey Recreation Centre do not offer a pre-registration option."
-                    elif venue_name in {"Henderson Recreation Centre", "Neighbourhood Learning Centre"}:
-                        description += " Registration opens up to four days in advance via Oak Bay PerfectMind."
-                    if event["note"]:
-                        description += f" {event['note']}"
-
-                    occurrences.append(
-                        {
-                            "source_id": f"{self.source_id_prefix}_{source_hash}",
-                            "title": event["title"],
-                            "sport_type": classify_sport(event["title"]),
-                            "venue_name": venue_name,
-                            "facility_name": "",
-                            "start_time": start_dt,
-                            "end_time": end_dt,
-                            "price": "",
-                            "description": description.strip(),
-                            "booking_url": pdf_url,
-                        }
-                    )
-            current += timedelta(days=1)
-
-        return occurrences
+    def _description(self, venue_name: str, notes: str) -> str:
+        description = "Oak Bay Group Fitness Drop-In PDF schedule."
+        if venue_name == "Monterey Recreation Centre":
+            description += " Note: drop-in programs at Monterey Recreation Centre do not offer a pre-registration option."
+        elif venue_name in {"Henderson Recreation Centre", "Neighbourhood Learning Centre"}:
+            description += " Registration opens up to four days in advance via Oak Bay PerfectMind."
+        if notes:
+            description += f" {notes}"
+        return description
 
     def scrape(self):
         print(f"[{self.municipality}] Starting Oak Bay group fitness PDF scrape...")
-        try:
-            pdf_url = self._discover_pdf_url()
-            layout_text = self._fetch_layout_text(pdf_url)
-            start_date, end_date = self._parse_date_range(layout_text)
-            sections = self._extract_sections(layout_text)
-        except Exception as exc:
-            print(f"[{self.municipality}] Oak Bay group fitness PDF failed: {exc}")
-            return []
+        pdf_url = self._discover_pdf_url()
+        response = self.session.get(pdf_url, timeout=30)
+        response.raise_for_status()
+        cards, page_text = read_cards(response.content, SECTIONS)
+        start_date, end_date = schedule_range(page_text)
+
+        skip_dates = set()
+        # The note sits beside the grid, so other columns' text can land mid-sentence.
+        if re.search(r"not\s+run\s+on\s+statutory\b.{0,80}?\bholidays", " ".join(page_text.split()), re.I):
+            for year in {start_date.year, end_date.year}:
+                skip_dates |= bc_statutory_holidays(year)
 
         all_events = []
         seen_ids = set()
-        for venue_name, day_map in sections.items():
-            for weekday, lines in day_map.items():
-                events = self._parse_day_events(lines)
-                for event in self._build_occurrences(venue_name, weekday, events, start_date, end_date, pdf_url):
-                    if event["source_id"] in seen_ids:
-                        continue
-                    seen_ids.add(event["source_id"])
-                    all_events.append(event)
+        for card in cards:
+            for day in occurrence_dates(card, start_date, end_date, skip_dates):
+                start_dt = datetime.combine(day, card.start)
+                end_dt = datetime.combine(day, card.end)
+                source_key = f"{card.section}|{card.title}|{start_dt.isoformat()}"
+                source_id = f"{self.source_id_prefix}_{hashlib.md5(source_key.encode('utf-8')).hexdigest()[:16]}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+                all_events.append(
+                    {
+                        "source_id": source_id,
+                        "title": card.title,
+                        "sport_type": classify_sport(card.title),
+                        "venue_name": card.section,
+                        "facility_name": "",
+                        "start_time": start_dt,
+                        "end_time": end_dt,
+                        "price": "",
+                        "description": self._description(card.section, card.notes),
+                        "booking_url": pdf_url,
+                    }
+                )
 
+        if not all_events:
+            raise ValueError(f"Oak Bay group fitness PDF produced no sessions: {pdf_url}")
         print(f"[{self.municipality}] Oak Bay group fitness PDF normalized {len(all_events)} events.")
+        # The PDF is the whole season, so republishing it in full drops superseded rows.
+        self.replace_existing_events()
         self.save_events(all_events)
         return all_events

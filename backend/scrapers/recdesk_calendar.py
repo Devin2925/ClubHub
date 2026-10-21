@@ -117,4 +117,9 @@ class RecDeskCalendarScraper(BaseScraper):
 
         print(f"[{self.municipality}] RecDesk normalized {len(normalized)} events for {self.venue_name}.")
         self.save_events(normalized)
+        # Earlier rows in the fetched window that the calendar no longer lists were cancelled or moved.
+        if normalized:
+            self.prune_unseen_upcoming(
+                {item["source_id"] for item in normalized}, start=start_date, end=end_date
+            )
         return normalized

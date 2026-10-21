@@ -341,12 +341,14 @@ class VikesRecScraper(BaseScraper):
     def scrape(self):
         print(f"[{self.municipality}] Starting UVic Vikes Recreation scrape...")
         events = []
+        complete = True
         for page in PAGE_CONFIGS:
             try:
                 page_events = self._events_from_page(page)
                 print(f"[{self.municipality}] {page['label']}: {len(page_events)} events")
                 events.extend(page_events)
             except Exception as exc:
+                complete = False
                 print(f"[{self.municipality}] Failed {page['label']} page: {exc}")
 
         try:
@@ -354,9 +356,14 @@ class VikesRecScraper(BaseScraper):
             print(f"[{self.municipality}] Squash Club: {len(squash_events)} events")
             events.extend(squash_events)
         except Exception as exc:
+            complete = False
             print(f"[{self.municipality}] Failed Squash Club page: {exc}")
 
         deduped = {event["source_id"]: event for event in events}
         normalized = list(deduped.values())
         self.save_events(normalized)
+        # Rows from earlier runs that the schedule no longer lists are cancelled or
+        # retimed sessions; only clear them when every page was read.
+        if complete and normalized:
+            self.prune_unseen_upcoming(deduped.keys())
         return normalized

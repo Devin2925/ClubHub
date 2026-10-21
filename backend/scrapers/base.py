@@ -19,7 +19,7 @@ SPORT_PATTERNS = [
     (r"tennis(?!\s*table)", "tennis"),
     (r"squash|racquetball", "squash"),
     (r"archery", "archery"),
-    (r"skating|figure\s*skat|ice\s*play|public\s*skat|adult\s*skate|skate\s*-", "skating"),
+    (r"skating|figure\s*skat|ice\s*play|\bskate\b", "skating"),
     (
         r"swim|aqua|pool|water|lengths|widths|family\s*swim|fun\s*and\s*features\s*swim|"
         r"lessons\s*&\s*leisure",
@@ -79,6 +79,11 @@ DROPOIN_PATTERNS = [
     r"family\s*swim",
     r"fun\s*and\s*features\s*swim",
     r"lessons\s*&\s*leisure",
+    r"leisure\s*(swim|pool)",
+    r"fun\s*swim",
+    r"water\s*slide|waterslide",
+    r"lanes?\s*(&|&amp;|and)\s*leisure",
+    r"^(shallow\s*|deep\s*)?water\s*walking",
     r"adult\s*skate",
     r"tot\s*hockey",
     r"ice\s*play",
@@ -256,6 +261,35 @@ class BaseScraper:
         except Exception as exc:
             db.rollback()
             print(f"[{self.municipality}] Replace error: {exc}")
+            raise
+        finally:
+            db.close()
+
+    def prune_unseen_upcoming(self, seen_source_ids, start=None, end=None):
+        """Drop this source's upcoming rows that a complete run no longer lists.
+
+        Only call after a run that fetched everything it covers; ``start``/``end``
+        limit pruning to the window the run actually fetched.
+        """
+        floor = datetime.combine(datetime.now().date(), datetime.min.time())
+        if start and start > floor:
+            floor = start
+        db = SessionLocal()
+        try:
+            query = (
+                delete(Event)
+                .where(Event.source == self.source_id_prefix)
+                .where(Event.start_time >= floor)
+                .where(Event.source_id.not_in(list(seen_source_ids)))
+            )
+            if end:
+                query = query.where(Event.start_time < end)
+            pruned = db.execute(query).rowcount or 0
+            db.commit()
+            if pruned:
+                print(f"[{self.municipality}] Pruned {pruned} upcoming {self.source_id_prefix} rows no longer listed")
+        except Exception:
+            db.rollback()
             raise
         finally:
             db.close()
