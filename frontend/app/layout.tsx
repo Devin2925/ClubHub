@@ -63,26 +63,25 @@ const popularSchedules = [
 const brandMark = (
   <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ marginRight: 6 }}>
     <defs>
-      <linearGradient id="brandBg" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stopColor="#0a5aa8" />
-        <stop offset="1" stopColor="#002554" />
+      <linearGradient id="brandBg" x1="32" y1="0" x2="32" y2="64" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#0d47b5" />
+        <stop offset="1" stopColor="#1a7fd6" />
+      </linearGradient>
+      <linearGradient id="brandGold" x1="32" y1="12" x2="32" y2="52" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#ffd23f" />
+        <stop offset="1" stopColor="#f5a412" />
       </linearGradient>
     </defs>
     <circle cx="32" cy="32" r="31" fill="url(#brandBg)" />
-    <circle cx="32" cy="32" r="28" fill="none" stroke="#f5aa1c" strokeWidth="2.5" />
+    <path d="M45.6 18.1A19.5 19.5 0 1 0 45.6 45.9" stroke="#0a2a6e" strokeWidth="12.5" strokeLinecap="round" />
+    <path d="M45.6 18.1A19.5 19.5 0 1 0 45.6 45.9" stroke="url(#brandGold)" strokeWidth="8" strokeLinecap="round" />
     <path
-      d="M32 14C22.1 14 14 22.1 14 32s8.1 18 18 18c4.2 0 8-1.4 11-3.8"
-      fill="none"
-      stroke="#ffffff"
-      strokeWidth="6"
-      strokeLinecap="round"
+      d="M41.5 5.5 23 35H32.5L26.5 58.5 46 28H36.5L41.5 5.5Z"
+      fill="#ffffff"
+      stroke="#0a2a6e"
+      strokeWidth="3"
+      strokeLinejoin="round"
     />
-    <path
-      d="M33 28.5h10.6l-3.4-3.4a2.5 2.5 0 1 1 3.5-3.5l7.6 7.6a2.5 2.5 0 0 1 0 3.5l-7.6 7.6a2.5 2.5 0 1 1-3.5-3.5l3.4-3.4H33a2.7 2.7 0 0 1 0-5.4Z"
-      fill="#f5aa1c"
-    />
-    <path d="M32 32 24.5 25.5" fill="none" stroke="#f5aa1c" strokeWidth="3.6" strokeLinecap="round" />
-    <circle cx="32" cy="32" r="2.4" fill="#ffffff" />
   </svg>
 );
 
