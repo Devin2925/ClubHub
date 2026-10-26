@@ -48,11 +48,6 @@ export const metadata: Metadata = {
     title: "ClubHub Victoria | Recreation schedules across Greater Victoria",
     description: "Track drop-ins, classes, swims, skates, and recreation times across Victoria, BC.",
   },
-  icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
-  },
 };
 
 const feedbackEmail = "clubhubvictoria@gmail.com";
@@ -68,37 +63,26 @@ const popularSchedules = [
 const brandMark = (
   <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ marginRight: 6 }}>
     <defs>
-      <linearGradient id="brandBg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stopColor="#31465f" />
-        <stop offset="1" stopColor="#08111d" />
-      </linearGradient>
-      <linearGradient id="brandAccent" x1="18" y1="18" x2="49" y2="45" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stopColor="#e7fbff" />
-        <stop offset="0.5" stopColor="#97ece1" />
-        <stop offset="1" stopColor="#57d6ce" />
+      <linearGradient id="brandBg" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#0a5aa8" />
+        <stop offset="1" stopColor="#002554" />
       </linearGradient>
     </defs>
-    <circle cx="32" cy="32" r="30" fill="url(#brandBg)" />
-    <circle cx="32" cy="32" r="29" fill="none" stroke="#d7efff" strokeOpacity="0.28" />
+    <circle cx="32" cy="32" r="31" fill="url(#brandBg)" />
+    <circle cx="32" cy="32" r="28" fill="none" stroke="#f5aa1c" strokeWidth="2.5" />
     <path
-      d="M32 11C21.5 11 13 19.5 13 30s8.5 19 19 19c4.4 0 8.4-1.5 11.6-4.1"
+      d="M32 14C22.1 14 14 22.1 14 32s8.1 18 18 18c4.2 0 8-1.4 11-3.8"
       fill="none"
-      stroke="#e8f2ff"
-      strokeOpacity="0.82"
-      strokeWidth="5"
+      stroke="#ffffff"
+      strokeWidth="6"
       strokeLinecap="round"
     />
     <path
-      d="M34 29h11.3l-3.8-3.8a2.2 2.2 0 1 1 3.1-3.1l7.4 7.4a2.2 2.2 0 0 1 0 3.1L44.6 40a2.2 2.2 0 1 1-3.1-3.1l3.8-3.9H34a2 2 0 0 1 0-4Z"
-      fill="url(#brandAccent)"
+      d="M33 28.5h10.6l-3.4-3.4a2.5 2.5 0 1 1 3.5-3.5l7.6 7.6a2.5 2.5 0 0 1 0 3.5l-7.6 7.6a2.5 2.5 0 1 1-3.5-3.5l3.4-3.4H33a2.7 2.7 0 0 1 0-5.4Z"
+      fill="#f5aa1c"
     />
-    <circle cx="32" cy="32" r="1.7" fill="#f4fbff" />
-    <path d="M32 32 23.8 25.6" fill="none" stroke="url(#brandAccent)" strokeWidth="3.1" strokeLinecap="round" />
-    <path d="M32 32 38.6 24.5" fill="none" stroke="url(#brandAccent)" strokeWidth="3.1" strokeLinecap="round" />
-    <path d="M32 19.3v-2.6" fill="none" stroke="#f1f7ff" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M20.2 32h-2.5" fill="none" stroke="#f1f7ff" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M32 44.7v2.6" fill="none" stroke="#f1f7ff" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M43.8 32h2.5" fill="none" stroke="#f1f7ff" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M32 32 24.5 25.5" fill="none" stroke="#f5aa1c" strokeWidth="3.6" strokeLinecap="round" />
+    <circle cx="32" cy="32" r="2.4" fill="#ffffff" />
   </svg>
 );
 
@@ -113,7 +97,7 @@ export default function RootLayout({
     name: SITE_NAME,
     url: SITE_URL,
     description: SITE_DESCRIPTION,
-    logo: `${SITE_URL}/icon.svg`,
+    logo: `${SITE_URL}/icon-512.png`,
     areaServed: {
       "@type": "AdministrativeArea",
       name: "Greater Victoria, British Columbia",
