@@ -1,7 +1,6 @@
-import snapshot from "../../data/demo-snapshot.json";
-import { getDateKey, getTodayKey, type EventData } from "./utils";
+import type { EventData } from "./utils";
 
-type DemoSourceRow = {
+export type DemoSourceRow = {
   source_key: string;
   display_name: string;
   municipality: string;
@@ -20,7 +19,7 @@ type DemoSourceRow = {
   is_stale: boolean;
 };
 
-type DemoVenueRow = {
+export type DemoVenueRow = {
   venue_key: string;
   municipality: string;
   venue_name: string;
@@ -32,7 +31,7 @@ type DemoVenueRow = {
   last_error: string | null;
 };
 
-type DemoSourceAlertRow = {
+export type DemoSourceAlertRow = {
   source_key: string;
   display_name: string;
   municipality: string;
@@ -46,7 +45,7 @@ type DemoSourceAlertRow = {
   last_succeeded_at: string | null;
 };
 
-type DemoVenueAlertRow = {
+export type DemoVenueAlertRow = {
   venue_key: string;
   municipality: string;
   venue_name: string;
@@ -72,7 +71,7 @@ export type DemoCampSourceRow = {
   tags: string[];
 };
 
-type DemoSnapshot = {
+export type DemoSnapshot = {
   generated_at: string;
   counts: {
     events: number;
@@ -105,57 +104,42 @@ const isVercelRuntime = process.env.VERCEL === "1";
 
 export const DEMO_MODE = explicitDemoMode || (isVercelRuntime && !hasHostedApi);
 
-export function getDemoSnapshot(): DemoSnapshot {
-  return snapshot as DemoSnapshot;
+// Upcoming events travel to the browser as a compact table (see packEvents in
+// snapshot.server.ts): repeated strings are sent once and referenced by index.
+export type PackedEvents = {
+  v: [string, string][]; // [venue_name, municipality]
+  u: string[]; // booking URLs
+  t: string[]; // titles
+  e: [number, number, string, string, number, string, string, number, string, string][];
+};
+
+export function unpackEvents(packed: PackedEvents): EventData[] {
+  return packed.e.map(([id, title, sport, offering, venue, start, end, url, price, facility]) => {
+    const [venueName, municipality] = packed.v[venue];
+    const day = start.slice(0, 10);
+    return {
+      id,
+      source_id: "",
+      title: packed.t[title],
+      sport_type: sport,
+      offering_type: offering,
+      venue_name: venueName,
+      facility_name: facility,
+      center_id: 0,
+      start_time: `${start}:00`,
+      end_time: end ? `${day} ${end}:00` : "",
+      price,
+      description: "",
+      booking_url: packed.u[url],
+      source: "",
+      municipality,
+      last_fetched: "",
+    };
+  });
 }
 
-// The snapshot is frozen at export time, so hide anything that has already finished.
-export function getDemoEvents(): EventData[] {
-  const todayKey = getTodayKey();
-  return (getDemoSnapshot().events || []).filter(
-    (event) => getDateKey(event.end_time || event.start_time) >= todayKey
-  );
-}
-
-export function getDemoCampSources(): DemoCampSourceRow[] {
-  return getDemoSnapshot().camp_sources || [];
-}
-
-export function getDemoSourceAlerts(): DemoSourceAlertRow[] {
-  return getDemoSnapshot().source_alerts || [];
-}
-
-export function getDemoVenueAlerts(): DemoVenueAlertRow[] {
-  return getDemoSnapshot().venue_alerts || [];
-}
-
-export function getDemoSports() {
-  const counts = new Map<string, number>();
-  for (const event of getDemoEvents()) {
-    counts.set(event.sport_type, (counts.get(event.sport_type) || 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .map(([sport, count]) => ({ sport, count }))
-    .sort((a, b) => b.count - a.count);
-}
-
-export function getDemoStatus() {
-  const data = getDemoSnapshot();
-  // The export writes naive UTC; mark it so browsers don't read it as local time.
-  const generatedAt = /[zZ]|[+-]\d{2}:\d{2}$/.test(data.generated_at) ? data.generated_at : `${data.generated_at}Z`;
-  return {
-    admin_access: false,
-    status: "demo",
-    last_fetched: generatedAt,
-    latest_sync_completed_at: generatedAt,
-    total_events: data.counts.events,
-    source_summary: data.source_summary,
-    venue_summary: data.venue_summary,
-    rerun_summary: {
-      changed_sources: data.sources.filter((row) => (row.last_event_delta || 0) !== 0).length,
-      source_alerts: data.source_alerts.length,
-      venue_alerts: data.venue_alerts.length,
-      latest_completed_at: data.generated_at,
-    },
-  };
+export async function fetchDemoEvents(): Promise<EventData[]> {
+  const response = await fetch("/events.json");
+  if (!response.ok) throw new Error(`Could not load schedules (${response.status})`);
+  return unpackEvents((await response.json()) as PackedEvents);
 }

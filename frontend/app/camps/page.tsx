@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import CampsPageClient from "./CampsPageClient";
+import { DEMO_MODE } from "../lib/demo";
+import { getDemoCampSources, getDemoEvents } from "../lib/snapshot.server";
+import CampsPageClient, { type DemoCampData } from "./CampsPageClient";
 
 export const metadata: Metadata = {
   title: "Kids Camps in Victoria BC",
@@ -19,7 +21,16 @@ export const metadata: Metadata = {
   ],
 };
 
+// Rebuilt hourly so finished camps drop off between deploys.
+export const revalidate = 3600;
+
 export default function CampsPage() {
-  return <CampsPageClient />;
+  const demo: DemoCampData | null = DEMO_MODE
+    ? {
+        events: getDemoEvents().filter((event) => event.offering_type === "camp"),
+        sources: getDemoCampSources() as unknown as DemoCampData["sources"],
+      }
+    : null;
+  return <CampsPageClient demo={demo} />;
 }
 

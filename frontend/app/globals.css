@@ -1294,3 +1294,107 @@ button {
     margin-top: 1.25rem;
   }
 }
+
+/* Session in progress */
+.event-card-live {
+  border-color: var(--sport-fitness);
+}
+
+.event-live-badge {
+  display: inline-block;
+  margin-right: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--sport-fitness);
+  color: var(--bg-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 0.12em;
+}
+
+/* Date chips stay reachable while scrolling a long day */
+.sticky-filter-row {
+  position: sticky;
+  top: 80px;
+  z-index: 30;
+  background: var(--bg-primary);
+  padding: 0.5rem 0;
+}
+
+/* The sticky date row already names the day, so day headers scroll normally */
+.page:has(.sticky-filter-row) .day-group-header {
+  position: static;
+}
+
+a.chip {
+  text-decoration: none;
+}
+
+.venue-hero {
+  padding: 2.5rem 0 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.venue-aka {
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+a.venue-address {
+  display: inline-block;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border-color-hover);
+  text-underline-offset: 3px;
+}
+
+.venue-about {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.venue-about .section-copy {
+  max-width: 640px;
+  margin-bottom: 1.25rem;
+}
+
+.trust-strip-footer {
+  margin-top: 3rem;
+}
+
+@media (max-width: 768px) {
+  .sticky-filter-row {
+    top: 58px;
+    margin: 0 -0.85rem;
+    padding: 0.45rem 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .sticky-filter-row .chip-group-label {
+    display: none;
+  }
+  .hero-compact h1 {
+    font-size: 1.5rem;
+  }
+  .hero-compact .hero-subtitle {
+    margin-bottom: 0.5rem;
+  }
+  .venue-hero {
+    padding: 1rem 0 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .venue-hero h1 {
+    font-size: 1.6rem;
+    margin-bottom: 0.3rem;
+  }
+  .venue-aka,
+  a.venue-address {
+    font-size: 0.88rem;
+  }
+  /* Bottom-of-page status cards: show all four on phones now that they're out of the way */
+  .trust-strip-footer .trust-card {
+    display: block;
+  }
+}

@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import {
   EventData,
   formatTime,
+  getDateKey,
   toScheduleIso,
   getOfferingMeta,
   getSportMeta,
@@ -15,9 +16,10 @@ import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 interface EventCardProps {
   event: EventData;
   includeStructuredData?: boolean;
+  happeningNow?: boolean;
 }
 
-export default function EventCard({ event, includeStructuredData = false }: EventCardProps) {
+export default function EventCard({ event, includeStructuredData = false, happeningNow = false }: EventCardProps) {
   const sport = getSportMeta(event.sport_type);
   const offering = getOfferingMeta(event.offering_type);
   const Icon = SPORT_ICON_COMPONENTS[event.sport_type] || GenericSportIcon;
@@ -69,7 +71,7 @@ export default function EventCard({ event, includeStructuredData = false }: Even
         />
       ) : null}
 
-      <div className="event-card">
+      <div className={`event-card${happeningNow ? " event-card-live" : ""}`}>
         <div className="event-time">
           <div className="event-time-start">
             {timeVal} <span className="event-time-am">{amPm}</span>
@@ -78,10 +80,16 @@ export default function EventCard({ event, includeStructuredData = false }: Even
         </div>
 
         <div className="event-info">
-          <div className="event-title">{event.title}</div>
+          <div className="event-title">
+            {happeningNow ? <span className="event-live-badge">Now</span> : null}
+            {event.title}
+          </div>
           <div className="event-meta">
             <span>
-              <Link href={`/venues/${venueSlug(event.venue_name)}`} className="event-inline-link">
+              <Link
+                href={`/venues/${venueSlug(event.venue_name)}?date=${getDateKey(event.start_time)}`}
+                className="event-inline-link"
+              >
                 {event.venue_name}
               </Link>
             </span>

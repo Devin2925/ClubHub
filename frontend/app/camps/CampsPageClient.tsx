@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import EventCard from "../components/EventCard";
-import { DEMO_MODE, getDemoCampSources, getDemoEvents } from "../lib/demo";
+import { DEMO_MODE } from "../lib/demo";
 import {
   API_BASE,
   DISPLAY_TIME_ZONE,
@@ -33,13 +33,16 @@ interface CampSourcePayload {
   };
 }
 
-export default function CampsPageClient() {
-  const [events, setEvents] = useState<EventData[]>(() =>
-    DEMO_MODE ? getDemoEvents().filter((event) => event.offering_type === "camp") : []
-  );
-  const [sources, setSources] = useState<CampSource[]>(() => (DEMO_MODE ? getDemoCampSources() : []));
+export interface DemoCampData {
+  events: EventData[];
+  sources: CampSource[];
+}
+
+export default function CampsPageClient({ demo }: { demo: DemoCampData | null }) {
+  const [events, setEvents] = useState<EventData[]>(() => demo?.events || []);
+  const [sources, setSources] = useState<CampSource[]>(() => demo?.sources || []);
   const [summary, setSummary] = useState<CampSourcePayload["summary"] | null>(() =>
-    DEMO_MODE ? buildCampSourceSummary(getDemoCampSources()) : null
+    demo ? buildCampSourceSummary(demo.sources) : null
   );
   const [loading, setLoading] = useState(!DEMO_MODE);
   const [activeMunicipality, setActiveMunicipality] = useState("");

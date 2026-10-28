@@ -1,8 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Link from "next/link";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "./lib/seo";
+
+// Matches the navbar so the phone's status bar blends in.
+export const viewport: Viewport = {
+  themeColor: "#111111",
+};
 
 // Static metadata
 export const metadata: Metadata = {
@@ -12,6 +17,11 @@ export const metadata: Metadata = {
     template: "%s | ClubHub Victoria",
   },
   description: SITE_DESCRIPTION,
+  appleWebApp: {
+    capable: true,
+    title: "ClubHub",
+    statusBarStyle: "black",
+  },
   keywords: [
     "ClubHub Victoria",
     "Victoria BC recreation schedules",

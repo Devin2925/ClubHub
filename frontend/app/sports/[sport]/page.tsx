@@ -1,5 +1,6 @@
 import { Metadata } from "next";
-import { DEMO_MODE, getDemoEvents } from "../../lib/demo";
+import { DEMO_MODE } from "../../lib/demo";
+import { getDemoEvents } from "../../lib/snapshot.server";
 import { getSportMeta, API_BASE, formatFullDate, getDateKey, EventData } from "../../lib/utils";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "../../components/SportIcons";
 import EventCard from "../../components/EventCard";

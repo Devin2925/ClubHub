@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import VenueScheduleClient from "../../components/VenueScheduleClient";
-import { DEMO_MODE, getDemoEvents } from "../../lib/demo";
+import { DEMO_MODE } from "../../lib/demo";
+import { getDemoEvents } from "../../lib/snapshot.server";
+import { readDateParam, readParam } from "../../lib/schedule";
 import {
   API_BASE,
   EventData,
@@ -20,6 +22,7 @@ import { closureHeadline, getVenueClosure } from "../../lib/closures";
 
 type Props = {
   params: Promise<{ venue: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -67,8 +70,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-export default async function VenueDetailPage({ params }: Props) {
+export default async function VenueDetailPage({ params, searchParams }: Props) {
   const resolvedParams = await params;
+  const query = await searchParams;
+  const initialQuery = {
+    date: query.date === undefined ? undefined : readDateParam(readParam(query.date)),
+    sport: readParam(query.sport) || undefined,
+    type: readParam(query.type) || undefined,
+  };
   let allEvents: EventData[] = [];
   if (DEMO_MODE) {
     allEvents = getDemoEvents();
@@ -78,7 +87,9 @@ export default async function VenueDetailPage({ params }: Props) {
     allEvents = data.events || [];
   }
 
-  const events = allEvents.filter((event) => venueSlug(event.venue_name) === resolvedParams.venue);
+  const events = allEvents
+    .filter((event) => venueSlug(event.venue_name) === resolvedParams.venue)
+    .map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
   const closure = getVenueClosure(resolvedParams.venue);
   const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
   const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
@@ -163,7 +174,7 @@ export default async function VenueDetailPage({ params }: Props) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
-        <Link href="/venues" className="section-link" style={{ marginTop: "2rem", display: "inline-flex" }}>
+        <Link href="/venues" className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
           Back to venue list
         </Link>
         <VenueScheduleClient
@@ -175,6 +186,8 @@ export default async function VenueDetailPage({ params }: Props) {
           summary={seo?.summary}
           address={seo?.address}
           alternatives={alternatives}
+          initialQuery={initialQuery}
+          initialNow={now}
         />
       </div>
     </main>

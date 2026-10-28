@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EventCard from "./EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 import {
@@ -12,7 +12,18 @@ import {
   getDateKey,
   getOfferingMeta,
   getSportMeta,
+  nowScheduleKey,
 } from "../lib/utils";
+import {
+  hasEnded,
+  isHappeningNow,
+  pickDefaultDate,
+  replaceSearch,
+  scheduleDates,
+  scheduleSearch,
+  dayChipLabel,
+  type ScheduleQuery,
+} from "../lib/schedule";
 import { closureHeadline, VenueClosure } from "../lib/closures";
 
 interface VenueScheduleClientProps {
@@ -24,6 +35,8 @@ interface VenueScheduleClientProps {
   summary?: string;
   address?: string;
   alternatives?: ClosureAlternativeGroup[];
+  initialQuery?: ScheduleQuery;
+  initialNow: string;
 }
 
 export interface ClosureAlternativeGroup {
@@ -47,47 +60,65 @@ export default function VenueScheduleClient({
   summary,
   address,
   alternatives = [],
+  initialQuery = {},
+  initialNow,
 }: VenueScheduleClientProps) {
-  const [activeDate, setActiveDate] = useState("");
-  const [activeSport, setActiveSport] = useState("");
-  const [activeOfferingType, setActiveOfferingType] = useState("");
+  // null = today (or the next day with sessions); "" = all dates
+  const [dateSelection, setDateSelection] = useState<string | null>(initialQuery.date ?? null);
+  const [activeSport, setActiveSport] = useState(initialQuery.sport || "");
+  const [activeOfferingType, setActiveOfferingType] = useState(initialQuery.type || "");
+  const [now, setNow] = useState(initialNow);
 
-  const dates = useMemo(() => {
-    return Array.from(new Set(events.map((event) => getDateKey(event.start_time))))
-      .sort()
-      .slice(0, 21);
-  }, [events]);
+  useEffect(() => {
+    // Sessions drop off as they finish while the page stays open.
+    const timer = window.setInterval(() => setNow(nowScheduleKey()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    replaceSearch({ date: dateSelection, sport: activeSport, type: activeOfferingType });
+  }, [dateSelection, activeSport, activeOfferingType]);
+
+  const upcoming = useMemo(() => events.filter((event) => !hasEnded(event, now)), [events, now]);
+  const dates = useMemo(() => scheduleDates(upcoming), [upcoming]);
+  const todayKey = now.slice(0, 10);
+  const activeDate = useMemo(
+    () => dateSelection ?? pickDefaultDate(dates, todayKey),
+    [dateSelection, dates, todayKey]
+  );
+  const query: ScheduleQuery = { date: dateSelection, sport: activeSport, type: activeOfferingType };
 
   const sportCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const event of events) {
+    for (const event of upcoming) {
       if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
       if (activeOfferingType && event.offering_type !== activeOfferingType) continue;
       counts.set(event.sport_type, (counts.get(event.sport_type) || 0) + 1);
     }
-
+    // Keep a chosen sport visible on days without it, so it can be cleared.
+    if (activeSport && !counts.has(activeSport)) counts.set(activeSport, 0);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [events, activeDate, activeOfferingType]);
+  }, [upcoming, activeDate, activeOfferingType, activeSport]);
 
   const offeringCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const event of events) {
+    for (const event of upcoming) {
       if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
       if (activeSport && event.sport_type !== activeSport) continue;
       counts.set(event.offering_type, (counts.get(event.offering_type) || 0) + 1);
     }
-
+    if (activeOfferingType && !counts.has(activeOfferingType)) counts.set(activeOfferingType, 0);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [events, activeDate, activeSport]);
+  }, [upcoming, activeDate, activeSport, activeOfferingType]);
 
   const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
+    return upcoming.filter((event) => {
       if (activeDate && getDateKey(event.start_time) !== activeDate) return false;
       if (activeSport && event.sport_type !== activeSport) return false;
       if (activeOfferingType && event.offering_type !== activeOfferingType) return false;
       return true;
     });
-  }, [events, activeDate, activeSport, activeOfferingType]);
+  }, [upcoming, activeDate, activeSport, activeOfferingType]);
 
   const groupedByDate = useMemo(() => {
     return Object.entries(
@@ -99,6 +130,13 @@ export default function VenueScheduleClient({
       }, {})
     ).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEvents]);
+
+  const viewLabel =
+    activeDate === todayKey
+      ? "Today"
+      : activeDate
+        ? formatFullDate(`${activeDate}T00:00:00`).replace(/, \d{4}$/, "")
+        : "All upcoming dates";
 
   const closureNotice = closure ? (
     <section className="closure-notice" role="status">
@@ -168,62 +206,55 @@ export default function VenueScheduleClient({
   return (
     <>
       {closureNotice}
-      <section className="hero" style={{ paddingTop: "3rem" }}>
+      <section className="hero venue-hero">
         <div className="chip-group-label">{municipality}</div>
         <h1>
-          What&apos;s on at <strong>{venueName}</strong>
+          <strong>{venueName}</strong>
         </h1>
-        <p className="hero-subtitle">
-          {summary || `Upcoming drop-ins, classes, swims, skates, and community activities at this venue in ${municipality}, BC.`}
-          {searchName ? ` Also known as ${searchName}.` : null}
-        </p>
-        {address ? <p className="venue-address">{address}</p> : null}
-
-        <div className="status-strip status-strip-wide">
-          <div className="status-card">
-            <div className="status-kicker">Upcoming</div>
-            <div className="status-number">{events.length}</div>
-            <div className="status-copy">Activities at this venue</div>
-          </div>
-          <div className="status-card">
-            <div className="status-kicker">Sports</div>
-            <div className="status-number">{sportCounts.length}</div>
-            <div className="status-copy">Categories available</div>
-          </div>
-          <div className="status-card">
-            <div className="status-kicker">Next Date</div>
-            <div className="status-number">
-              {events[0] ? formatMonthDay(events[0].start_time) : "-"}
-            </div>
-            <div className="status-copy">Earliest upcoming session</div>
-          </div>
-        </div>
+        {searchName ? <p className="venue-aka">Also known as {searchName}</p> : null}
+        {address ? (
+          <a
+            className="venue-address"
+            href={`https://maps.apple.com/?q=${encodeURIComponent(`${venueName}, ${address}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {address}
+          </a>
+        ) : null}
       </section>
 
-      <section className="simple-date-row">
+      <section className="simple-date-row sticky-filter-row" id="schedule">
         <div className="chip-group-label">Dates</div>
         <div className="horizontal-scroller full-width-scroller">
-          <button
-            className={`chip ${activeDate === "" ? "active" : ""}`}
-            onClick={() => setActiveDate("")}
-            type="button"
-          >
-            All Dates
-          </button>
           {dates.map((date) => (
-            <button
+            <a
               key={date}
               className={`chip ${activeDate === date ? "active" : ""}`}
-              onClick={() => setActiveDate(date)}
-              type="button"
+              href={scheduleSearch({ ...query, date })}
+              aria-current={activeDate === date ? "date" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setDateSelection(date);
+              }}
             >
-              {formatFullDate(`${date}T00:00:00`).replace(", 2026", "")}
-            </button>
+              {dayChipLabel(date, todayKey)}
+            </a>
           ))}
+          <a
+            className={`chip ${activeDate === "" ? "active" : ""}`}
+            href={scheduleSearch({ ...query, date: "" })}
+            onClick={(event) => {
+              event.preventDefault();
+              setDateSelection("");
+            }}
+          >
+            All Dates
+          </a>
         </div>
       </section>
 
-      <section className="simple-activity-row" style={{ marginTop: "1rem" }}>
+      <section className="simple-activity-row">
         <div className="chip-group-label">Sports</div>
         <div className="horizontal-scroller">
           <button
@@ -241,7 +272,7 @@ export default function VenueScheduleClient({
               <button
                 key={sport}
                 className={`chip emoji-chip sport-chip ${activeSport === sport ? "active" : ""}`}
-                onClick={() => setActiveSport(sport)}
+                onClick={() => setActiveSport(activeSport === sport ? "" : sport)}
                 type="button"
                 style={{ color: activeSport === sport ? undefined : meta.color }}
               >
@@ -254,7 +285,7 @@ export default function VenueScheduleClient({
         </div>
       </section>
 
-      <section className="simple-activity-row" style={{ marginTop: "1rem" }}>
+      <section className="simple-activity-row">
         <div className="chip-group-label">Activity Types</div>
         <div className="horizontal-scroller">
           <button
@@ -268,7 +299,7 @@ export default function VenueScheduleClient({
             <button
               key={offeringType}
               className={`chip ${activeOfferingType === offeringType ? "active" : ""}`}
-              onClick={() => setActiveOfferingType(offeringType)}
+              onClick={() => setActiveOfferingType(activeOfferingType === offeringType ? "" : offeringType)}
               type="button"
             >
               {getOfferingMeta(offeringType).label} {count}
@@ -278,31 +309,61 @@ export default function VenueScheduleClient({
       </section>
 
       <section className="simple-results-header">
-        <div className="chip-group-label">Current View</div>
-        <h2 className="section-title">{venueName}</h2>
-        <p className="section-copy">{filteredEvents.length} activities showing</p>
+        <h2 className="section-title">{viewLabel}</h2>
+        <p className="section-copy">
+          {filteredEvents.length} {filteredEvents.length === 1 ? "session" : "sessions"}
+          {activeDate === todayKey ? " left today" : ""}
+        </p>
       </section>
 
       {groupedByDate.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state-mark">No Results</span>
-          No activities match the current filters for this rec centre.
+          {activeDate === todayKey && upcoming.some((event) => getDateKey(event.start_time) > todayKey)
+            ? "Nothing else on today. Pick another date above."
+            : "No activities match the current filters for this rec centre."}
         </div>
       ) : (
         groupedByDate.map(([dateKey, dayEvents]) => (
           <div key={dateKey} className="day-group">
-            <div className="day-group-header">
-              <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
-              <span className="day-count">{dayEvents.length} activities</span>
-            </div>
+            {activeDate ? null : (
+              <div className="day-group-header">
+                <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
+                <span className="day-count">{dayEvents.length} activities</span>
+              </div>
+            )}
             <div className="events-list">
               {dayEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard key={event.id} event={event} happeningNow={isHappeningNow(event, now)} />
               ))}
             </div>
           </div>
         ))
       )}
+
+      <section className="venue-about">
+        <h2 className="section-title">About {venueName}</h2>
+        <p className="section-copy">
+          {summary || `Upcoming drop-ins, classes, swims, skates, and community activities at this venue in ${municipality}, BC.`}
+        </p>
+        <div className="status-strip status-strip-wide">
+          <div className="status-card">
+            <div className="status-kicker">Upcoming</div>
+            <div className="status-number">{upcoming.length}</div>
+            <div className="status-copy">Sessions at this venue</div>
+          </div>
+          <div className="status-card">
+            <div className="status-kicker">Dates</div>
+            <div className="status-number">{dates.length}</div>
+            <div className="status-copy">Days with sessions</div>
+          </div>
+          <div className="status-card">
+            <div className="status-kicker">Next Date</div>
+            <div className="status-number">{upcoming[0] ? formatMonthDay(upcoming[0].start_time) : "-"}</div>
+            <div className="status-copy">Earliest upcoming session</div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }
