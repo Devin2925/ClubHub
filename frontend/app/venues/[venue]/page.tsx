@@ -109,7 +109,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
   const seo = getVenueSeo(resolvedParams.venue);
   const searchName = getVenueSearchName(resolvedParams.venue);
   const pageHeading = venuePageHeading(resolvedParams.venue, venueName);
-  const activityPages = venueSportCounts(resolvedParams.venue)
+  const relatedLinks = venueSportCounts(resolvedParams.venue)
     .filter(([, count]) => count >= MIN_VENUE_SPORT_SESSIONS)
     .map(([sport, count]) => ({
       href: `/venues/${resolvedParams.venue}/${sport}`,
@@ -212,7 +212,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
           address={seo?.address}
           answers={seo?.answers}
           updatedLabel={snapshotUpdatedLabel()}
-          activityPages={activityPages}
+          relatedLinks={relatedLinks}
           alternatives={alternatives}
           initialQuery={initialQuery}
           initialNow={now}

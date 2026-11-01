@@ -22,13 +22,24 @@ import {
   scheduleDates,
   scheduleSearch,
   dayChipLabel,
+  eventMatcher,
+  type EventFilter,
   type ScheduleQuery,
 } from "../lib/schedule";
 import { closureHeadline, VenueClosure } from "../lib/closures";
+import { fetchDemoEvents } from "../lib/demo";
 
 interface VenueScheduleClientProps {
   events: EventData[];
+  // Landing pages server-render one day; with `loadFilter` the browser then fetches
+  // the rest from /events.json. `initialDates`/`initialTotal` describe the full list.
+  loadFilter?: EventFilter;
+  initialDates?: string[];
+  initialTotal?: number;
   venueName: string;
+  // Replaces the venue name under the heading (area and sport pages aren't one venue).
+  subtitle?: string;
+  aboutTitle?: string;
   municipality: string;
   closure?: VenueClosure;
   searchName?: string;
@@ -37,8 +48,8 @@ interface VenueScheduleClientProps {
   address?: string;
   answers?: { question: string; answer: string }[];
   updatedLabel: string;
-  // Links to this venue's one-activity pages ("CARSA yoga schedule"); featured ones also show in the hero.
-  activityPages?: { href: string; label: string; count: number; featured?: boolean }[];
+  // Related schedules ("CARSA yoga schedule", a sport's venues); featured ones also show in the hero.
+  relatedLinks?: { href: string; label: string; count?: number; featured?: boolean }[];
   // On a one-activity page every session is the same sport, so the sport chips are noise.
   hideSportFilter?: boolean;
   alternatives?: ClosureAlternativeGroup[];
@@ -59,8 +70,13 @@ export interface ClosureAlternativeGroup {
 }
 
 export default function VenueScheduleClient({
-  events,
+  events: initialEvents,
+  loadFilter,
+  initialDates,
+  initialTotal,
   venueName,
+  subtitle,
+  aboutTitle,
   municipality,
   closure,
   searchName,
@@ -69,7 +85,7 @@ export default function VenueScheduleClient({
   address,
   answers = [],
   updatedLabel,
-  activityPages = [],
+  relatedLinks = [],
   hideSportFilter = false,
   alternatives = [],
   initialQuery = {},
@@ -80,6 +96,27 @@ export default function VenueScheduleClient({
   const [activeSport, setActiveSport] = useState(initialQuery.sport || "");
   const [activeOfferingType, setActiveOfferingType] = useState(initialQuery.type || "");
   const [now, setNow] = useState(initialNow);
+  const [events, setEvents] = useState(initialEvents);
+  const [fullLoaded, setFullLoaded] = useState(!loadFilter);
+
+  useEffect(() => {
+    if (!loadFilter) return;
+    let cancelled = false;
+    fetchDemoEvents()
+      .then((all) => {
+        if (cancelled) return;
+        setEvents(all.filter(eventMatcher(loadFilter)));
+        setFullLoaded(true);
+      })
+      .catch(() => {
+        // Keep the server-rendered day if the full schedule can't be fetched.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // The filter is fixed for the page, so fetch once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Sessions drop off as they finish while the page stays open.
@@ -92,7 +129,9 @@ export default function VenueScheduleClient({
   }, [dateSelection, activeSport, activeOfferingType]);
 
   const upcoming = useMemo(() => events.filter((event) => !hasEnded(event, now)), [events, now]);
-  const dates = useMemo(() => scheduleDates(upcoming), [upcoming]);
+  const computedDates = useMemo(() => scheduleDates(upcoming), [upcoming]);
+  const dates = fullLoaded || !initialDates ? computedDates : initialDates;
+  const upcomingCount = fullLoaded || initialTotal === undefined ? upcoming.length : initialTotal;
   const todayKey = now.slice(0, 10);
   const activeDate = useMemo(
     () => dateSelection ?? pickDefaultDate(dates, todayKey),
@@ -236,12 +275,14 @@ export default function VenueScheduleClient({
         <h1>
           <strong>{pageHeading}</strong>
         </h1>
-        {pageHeading.includes(venueName) ? (
+        {subtitle ? (
+          <p className="venue-aka">{subtitle}</p>
+        ) : pageHeading.includes(venueName) ? (
           searchName ? <p className="venue-aka">Also known as {searchName}</p> : null
         ) : (
           <p className="venue-aka">{venueName}</p>
         )}
-        {activityPages
+        {relatedLinks
           .filter((page) => page.featured)
           .map((page) => (
             <a key={page.href} href={page.href} className="inline-link venue-featured-link">
@@ -359,7 +400,7 @@ export default function VenueScheduleClient({
           <span className="empty-state-mark">No Results</span>
           {activeDate === todayKey && upcoming.some((event) => getDateKey(event.start_time) > todayKey)
             ? "Nothing else on today. Pick another date above."
-            : "No activities match the current filters for this rec centre."}
+            : "No activities match the current filters."}
         </div>
       ) : (
         groupedByDate.map(([dateKey, dayEvents]) => (
@@ -380,15 +421,15 @@ export default function VenueScheduleClient({
       )}
 
       <section className="venue-about">
-        <h2 className="section-title">About {venueName}</h2>
+        <h2 className="section-title">{aboutTitle || `About ${venueName}`}</h2>
         <p className="section-copy">
           {summary || `Upcoming drop-ins, classes, swims, skates, and community activities at this venue in ${municipality}, BC.`}
         </p>
         <div className="status-strip status-strip-wide">
           <div className="status-card">
             <div className="status-kicker">Upcoming</div>
-            <div className="status-number">{upcoming.length}</div>
-            <div className="status-copy">Sessions at this venue</div>
+            <div className="status-number">{upcomingCount}</div>
+            <div className="status-copy">Upcoming sessions</div>
           </div>
           <div className="status-card">
             <div className="status-kicker">Dates</div>
@@ -401,11 +442,12 @@ export default function VenueScheduleClient({
             <div className="status-copy">Earliest upcoming session</div>
           </div>
         </div>
-        {activityPages.length > 0 ? (
-          <nav className="venue-activity-links" aria-label={`${searchName || venueName} schedules by activity`}>
-            {activityPages.map((page) => (
+        {relatedLinks.length > 0 ? (
+          <nav className="venue-activity-links" aria-label="Related schedules">
+            {relatedLinks.map((page) => (
               <a key={page.href} href={page.href} className="chip">
-                {page.label} <span className="emoji-chip-count">{page.count}</span>
+                {page.label}
+                {page.count !== undefined ? <span className="emoji-chip-count">{page.count}</span> : null}
               </a>
             ))}
           </nav>

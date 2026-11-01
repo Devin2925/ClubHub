@@ -71,6 +71,31 @@ const popularSchedules = [
   { href: "/venues/fairfield-community-place", label: "Fairfield Community Centre" },
   { href: "/venues/crystal-pool-and-fitness-centre", label: "Crystal Pool closure & alternatives" },
 ];
+// Searches that span venues: "lane swim victoria", "drop in basketball victoria".
+const popularActivities = [
+  { href: "/sports/swimming/lane-swimming", label: "Lane swimming" },
+  { href: "/sports/swimming/public-swimming", label: "Public swims" },
+  { href: "/sports/swimming/aquafit", label: "Aquafit" },
+  { href: "/sports/skating/public-skating", label: "Public skating" },
+  { href: "/sports/hockey/drop-in-hockey", label: "Drop-in hockey" },
+  { href: "/sports/hockey/stick-and-puck", label: "Stick and puck" },
+  { href: "/sports/pickleball", label: "Drop-in pickleball" },
+  { href: "/sports/basketball", label: "Drop-in basketball" },
+  { href: "/sports/volleyball", label: "Drop-in volleyball" },
+  { href: "/sports/badminton", label: "Drop-in badminton" },
+  { href: "/sports/yoga", label: "Drop-in yoga" },
+  { href: "/sports/fitness/spin-classes", label: "Spin classes" },
+];
+const areaSchedules = [
+  { href: "/areas/saanich", label: "Saanich" },
+  { href: "/areas/victoria", label: "Victoria" },
+  { href: "/areas/oak-bay", label: "Oak Bay" },
+  { href: "/areas/esquimalt", label: "Esquimalt" },
+  { href: "/areas/west-shore", label: "Langford & West Shore" },
+  { href: "/areas/panorama", label: "Saanich Peninsula" },
+  { href: "/areas/sooke", label: "Sooke" },
+  { href: "/areas/uvic", label: "UVic" },
+];
 const brandMark = (
   <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ marginRight: 6 }}>
     <defs>
@@ -181,13 +206,20 @@ export default function RootLayout({
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
               Recreation schedules for drop-ins, classes, and community activities across Victoria, BC and Greater Victoria.
             </p>
-            <nav className="footer-popular" aria-label="Popular schedules">
-              {popularSchedules.map((item) => (
-                <Link key={item.href} href={item.href} className="inline-link">
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            {[
+              { label: "Popular schedules", links: popularSchedules },
+              { label: "Drop-ins by activity", links: popularActivities },
+              { label: "Drop-ins by area", links: areaSchedules },
+            ].map((group) => (
+              <nav key={group.label} className="footer-popular" aria-label={group.label}>
+                <span className="footer-popular-label">{group.label}</span>
+                {group.links.map((item) => (
+                  <Link key={item.href} href={item.href} className="inline-link">
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            ))}
             <div className="footer-trust-links">
               <span>Victoria, BC schedule aggregator</span>
               <span>Upcoming dates only</span>

@@ -71,3 +71,22 @@ export function dayChipLabel(date: string, todayKey: string): string {
   if (date === tomorrow) return "Tomorrow";
   return formatDate(`${date}T00:00:00`);
 }
+
+// Which sessions a landing page covers ("Saanich", "swimming", "lane swims"); the
+// server uses it for the first day and the browser for the full schedule.
+export interface EventFilter {
+  venue?: string;
+  municipality?: string;
+  sports?: string[];
+  // Case-insensitive regex source matched against the session title.
+  pattern?: string;
+}
+
+export function eventMatcher(filter: EventFilter): (event: EventData) => boolean {
+  const pattern = filter.pattern ? new RegExp(filter.pattern, "i") : null;
+  return (event) =>
+    (!filter.venue || event.venue_name === filter.venue) &&
+    (!filter.municipality || event.municipality === filter.municipality) &&
+    (!filter.sports?.length || filter.sports.includes(event.sport_type)) &&
+    (!pattern || pattern.test(event.title));
+}

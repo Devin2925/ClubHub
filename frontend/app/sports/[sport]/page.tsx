@@ -1,183 +1,94 @@
 import { Metadata } from "next";
-import { DEMO_MODE } from "../../lib/demo";
-import { getDemoEvents } from "../../lib/snapshot.server";
-import { getSportMeta, API_BASE, formatFullDate, getDateKey, EventData } from "../../lib/utils";
-import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "../../components/SportIcons";
-import EventCard from "../../components/EventCard";
-import Link from "next/link";
-import { getSportSnapshot, SITE_NAME } from "../../lib/seo";
+import { notFound } from "next/navigation";
+import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../components/LandingSchedulePage";
+import { getSportMeta, SPORT_META, venueSlug } from "../../lib/utils";
+import { MIN_VENUE_SPORT_SESSIONS, SITE_NAME } from "../../lib/seo";
+import { activityPages, getSportCopy, sessionCount, venueCounts, venueListLabel } from "../../lib/searchPages";
 
 type Props = {
   params: Promise<{ sport: string }>;
+  searchParams: SearchParams;
 };
 
-export async function generateMetadata(
-  { params }: Props
-): Promise<Metadata> {
-  const resolvedParams = await params;
-  const sport = resolvedParams.sport;
-  const sportData = getSportSnapshot(sport);
-  const sportMeta = getSportMeta(sport);
-  const title = `${sportData.label} in Victoria, BC | Drop-In Schedules, Venues, and Times`;
-  const description =
-    sportData.eventCount > 0
-      ? `Browse ${sportData.eventCount} upcoming ${sportData.label.toLowerCase()} sessions across ${sportData.venueCount} venues in Greater Victoria, BC. Check times, locations, and drop-in details on ${SITE_NAME}.`
-      : `Browse upcoming ${sportData.label.toLowerCase()} sessions in Greater Victoria, BC. Check venues, dates, and recreation schedule updates on ${SITE_NAME}.`;
-
+function sportPage(sport: string) {
+  const filter = { sports: [sport] };
+  const venues = venueCounts(filter);
   return {
-    title,
-    description,
-    keywords: [
-      `${sportMeta.label} Victoria BC`,
-      `${sportMeta.label} Greater Victoria`,
-      `drop-in ${sportMeta.label.toLowerCase()} Victoria`,
-      `${sportMeta.label} schedule Victoria BC`,
-      `${SITE_NAME} ${sportMeta.label}`,
-    ],
-    openGraph: {
-      title,
-      description,
-      type: "website",
-      url: `/sports/${sport}`,
-    },
-    alternates: {
-      canonical: `/sports/${sport}`,
-    },
+    filter,
+    venues,
+    count: sessionCount(filter),
+    copy: getSportCopy(sport),
+    label: getSportMeta(sport).label,
   };
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { sport } = await params;
+  const page = sportPage(sport);
+  const venues = page.venues.map(([name]) => name);
+  return landingMetadata({
+    title: page.copy.title,
+    description:
+      page.count > 0
+        ? `${page.copy.summary} ${page.count} upcoming sessions at ${venueListLabel(venues, 2)}.`
+        : page.copy.summary,
+    path: `/sports/${sport}`,
+    count: page.count,
+    keywords: [
+      `drop in ${page.label.toLowerCase()} victoria`,
+      `${page.label.toLowerCase()} victoria bc`,
+      `${page.label.toLowerCase()} schedule victoria`,
+      `${page.label.toLowerCase()} today victoria`,
+      `${SITE_NAME} ${page.label}`,
+    ],
+  });
 }
 
 export const dynamic = "force-dynamic";
 
-export default async function SportDetailPage({ params }: Props) {
-  const resolvedParams = await params;
-  const sport = resolvedParams.sport;
-  const meta = getSportMeta(sport);
-  const Icon = SPORT_ICON_COMPONENTS[sport] || GenericSportIcon;
+export default async function SportDetailPage({ params, searchParams }: Props) {
+  const { sport } = await params;
+  if (!SPORT_META[sport]) notFound();
+  const page = sportPage(sport);
+  const venueNames = page.venues.map(([name]) => name);
 
-  let events: EventData[] = [];
-  if (DEMO_MODE) {
-    events = getDemoEvents().filter((event) => event.sport_type === sport);
-  } else {
-    const res = await fetch(`${API_BASE}/api/events?sport=${sport}`, { cache: 'no-store' });
-    const data = await res.json();
-    events = data.events || [];
-  }
-
-  // Group by date
-  const groups: Record<string, EventData[]> = {};
-  for (const ev of events) {
-    const key = getDateKey(ev.start_time);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(ev);
-  }
-  const grouped = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-
-  // Unique venues for this sport
-  const counts: Record<string, number> = {};
-  for (const ev of events) {
-    counts[ev.venue_name] = (counts[ev.venue_name] || 0) + 1;
-  }
-  const venueBreakdown = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const sportJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: `${meta.label} in Victoria, BC`,
-    description: `Upcoming ${meta.label.toLowerCase()} schedules across Greater Victoria.`,
-    url: `https://clubhubvictoria.ca/sports/${sport}`,
-    isPartOf: {
-      "@type": "WebSite",
-      name: SITE_NAME,
-      url: "https://clubhubvictoria.ca",
-    },
-    about: {
-      "@type": "Thing",
-      name: meta.label,
-    },
-  };
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: "https://clubhubvictoria.ca",
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Sports",
-        item: "https://clubhubvictoria.ca/sports",
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: meta.label,
-        item: `https://clubhubvictoria.ca/sports/${sport}`,
-      },
-    ],
-  };
+  const relatedLinks = [
+    ...activityPages()
+      .filter((activity) => activity.sport === sport)
+      .map((activity) => ({
+        href: `/sports/${sport}/${activity.slug}`,
+        label: activity.label,
+        count: activity.count,
+        featured: true,
+      })),
+    ...page.venues.map(([name, count]) => ({
+      href:
+        count >= MIN_VENUE_SPORT_SESSIONS ? `/venues/${venueSlug(name)}/${sport}` : `/venues/${venueSlug(name)}`,
+      label: name,
+      count,
+    })),
+  ];
 
   return (
-    <main className="page">
-      <div className="container">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(sportJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-        />
-        <Link href="/sports" style={{ color: "var(--text-muted)", fontSize: "0.9rem", display: "inline-block", marginBottom: "1.5rem", fontWeight: 500 }}>
-          ← Back to All Sports
-        </Link>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
-          <div style={{
-            color: meta.color,
-            background: "var(--bg-card)",
-            border: `1px solid ${meta.color}40`,
-            width: "60px", height: "60px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Icon width="32" height="32" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: "2.5rem", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "0.25rem" }}>
-              <strong>{meta.label}</strong> in Victoria, BC
-            </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: "1.1rem" }}>
-              {events.length} upcoming sessions across {venueBreakdown.length} venues in Greater Victoria.
-            </p>
-          </div>
-        </div>
-
-        <div style={{ marginTop: "2rem" }}>
-          {grouped.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "4rem 0", color: "var(--text-muted)" }}>
-               No upcoming matches scheduled.
-            </div>
-          ) : (
-            grouped.map(([dateKey, dayEvents]) => (
-              <div key={dateKey} className="day-group">
-                <div className="day-group-header">
-                  <span className="day-group-date">{formatFullDate(dateKey + "T00:00:00")}</span>
-                  <span style={{ background: "var(--bg-glass)", padding: "0.2rem 0.6rem", borderRadius: "100px", fontSize: "0.8rem", color: "var(--text-muted)", marginLeft: "0.5rem" }}>
-                    {dayEvents.length} sessions
-                  </span>
-                </div>
-                <div className="events-list">
-                  {dayEvents.map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </main>
+    <LandingSchedulePage
+      filter={page.filter}
+      searchParams={searchParams}
+      path={`/sports/${sport}`}
+      heading={page.copy.heading}
+      kicker="Greater Victoria"
+      shortName={page.label.toLowerCase()}
+      subtitle={`${page.count} upcoming sessions at ${page.venues.length} ${page.venues.length === 1 ? "venue" : "venues"}`}
+      summary={venueNames.length ? `${page.copy.summary} Venues include ${venueListLabel(venueNames, 4)}.` : page.copy.summary}
+      aboutTitle={`${page.label} across Greater Victoria`}
+      collectionName={`${page.label} in Victoria, BC`}
+      breadcrumbs={[
+        { name: "Home", path: "/" },
+        { name: "Sports", path: "/sports" },
+        { name: page.label, path: `/sports/${sport}` },
+      ]}
+      back={{ name: "All sports", path: "/sports" }}
+      relatedLinks={relatedLinks}
+      hideSportFilter
+    />
   );
 }

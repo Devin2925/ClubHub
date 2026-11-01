@@ -8,6 +8,7 @@ import type {
   DemoVenueAlertRow,
   PackedEvents,
 } from "./demo";
+import { eventMatcher, pickDefaultDate, scheduleDates, type EventFilter } from "./schedule";
 import { getDateKey, getTodayKey, nowScheduleKey, type EventData } from "./utils";
 
 export function getDemoSnapshot(): DemoSnapshot {
@@ -113,3 +114,15 @@ export function slimEvent(event: EventData): EventData {
 
 export type DemoCampSource = DemoCampSourceRow;
 export type { DemoSourceAlertRow, DemoVenueAlertRow, DemoSnapshot };
+
+// A landing page's first paint: only the day the visitor sees (from ?date= or
+// today), with the full list fetched by the browser afterwards.
+export function initialSchedule(filter: EventFilter, date: string | null | undefined, now: string) {
+  const upcoming = getUnfinishedEvents(now).filter(eventMatcher(filter));
+  const dates = scheduleDates(upcoming);
+  const day = date ?? pickDefaultDate(dates, now.slice(0, 10));
+  const events = (day ? upcoming.filter((event) => getDateKey(event.start_time) === day) : upcoming.slice(0, 80)).map(
+    slimEvent
+  );
+  return { upcoming, dates, events };
+}

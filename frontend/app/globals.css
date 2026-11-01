@@ -723,6 +723,14 @@ button {
   font-size: 0.9rem;
 }
 
+.footer-popular-label {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .venue-address {
   color: var(--text-muted);
   font-size: 0.9rem;

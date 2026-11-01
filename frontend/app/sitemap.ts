@@ -3,6 +3,7 @@ import snapshot from "../data/demo-snapshot.json";
 import { venueSlug } from "./lib/utils";
 import { VENUE_CLOSURES } from "./lib/closures";
 import { venueSportPages } from "./lib/seo";
+import { activityPages, areaPages, sportPages } from "./lib/searchPages";
 
 const siteUrl = "https://clubhubvictoria.ca";
 
@@ -10,13 +11,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // Google recommends an accurate lastmod value, not the time the sitemap was requested.
   const snapshotModified = new Date(`${snapshot.generated_at}Z`);
   const eventRows = snapshot.events || [];
-  const sportSet = new Set<string>();
   const venueSet = new Set<string>();
 
   for (const event of eventRows) {
-    if (event.sport_type) {
-      sportSet.add(event.sport_type);
-    }
     if (event.venue_name) {
       venueSet.add(venueSlug(event.venue_name));
     }
@@ -53,7 +50,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const sportPages = Array.from(sportSet)
+  // Only sports with upcoming sessions; an empty sport page isn't worth indexing.
+  const sportUrls = sportPages()
+    .map(({ sport }) => sport)
     .sort()
     .map((sport) => ({
       url: `${siteUrl}/sports/${sport}`,
@@ -80,5 +79,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     }));
 
-  return [...staticPages, ...sportPages, ...venuePages, ...venueSportUrls];
+  const landingUrls = [
+    ...areaPages().map(({ slug }) => `/areas/${slug}`),
+    ...activityPages().map(({ sport, slug }) => `/sports/${sport}/${slug}`),
+  ].map((path) => ({
+    url: `${siteUrl}${path}`,
+    lastModified: snapshotModified,
+    changeFrequency: "daily" as const,
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...landingUrls, ...sportUrls, ...venuePages, ...venueSportUrls];
 }

@@ -123,6 +123,10 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
           summary={page.summary}
           answers={page.seo?.answers}
           updatedLabel={snapshotUpdatedLabel()}
+          relatedLinks={[
+            { href: `/venues/${venue}`, label: `All ${page.displayName} activities` },
+            { href: `/sports/${sport}`, label: `${page.label} across Greater Victoria` },
+          ]}
           hideSportFilter
           initialQuery={initialQuery}
           initialNow={nowScheduleKey()}
