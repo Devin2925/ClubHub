@@ -9,6 +9,7 @@ export const SPORT_META: Record<string, { color: string; label: string }> = {
   skating:       { color: "#818cf8", label: "Skating" },
   swimming:      { color: "#22d3ee", label: "Swimming" },
   fitness:       { color: "#fbbf24", label: "Fitness" },
+  yoga:          { color: "#fb7185", label: "Yoga" },
   archery:       { color: "#a3e635", label: "Archery" },
   arts:          { color: "#e879f9", label: "Arts" },
   kids:          { color: "#fcd34d", label: "Kids" },

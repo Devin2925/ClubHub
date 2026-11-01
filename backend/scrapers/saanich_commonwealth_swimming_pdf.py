@@ -201,14 +201,21 @@ class SaanichCommonwealthSwimmingPDFScraper(BaseScraper):
             texts = [w["text"].upper() for w in line]
             if "MON" not in texts or "SUN" not in texts:
                 continue
-            centers, dates = [], {}
+            centers, dates, unnumbered = [], {}, 0
             for index, day in enumerate(DAY_ORDER):
                 if day not in texts:
                     raise ValueError(f"Missing {day} column in {pdf_url}")
                 position = texts.index(day)
                 number_word = line[position + 1] if position + 1 < len(line) else None
                 expected = week_start + timedelta(days=index)
-                if not number_word or number_word["text"] != str(expected.day):
+                if not number_word or not number_word["text"].isdigit():
+                    # The Nov 2-8 sheet printed "SUN" with no date; one gap is a typo,
+                    # more means the header isn't the layout we know.
+                    unnumbered += 1
+                    if unnumbered > 1:
+                        raise ValueError(f"Day header is missing day numbers in {pdf_url}")
+                    number_word = line[position]
+                elif number_word["text"] != str(expected.day):
                     raise ValueError(
                         f"Day column {day} does not match expected {expected.isoformat()} in {pdf_url}"
                     )

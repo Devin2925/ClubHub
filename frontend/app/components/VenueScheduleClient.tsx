@@ -32,8 +32,15 @@ interface VenueScheduleClientProps {
   municipality: string;
   closure?: VenueClosure;
   searchName?: string;
+  pageHeading: string;
   summary?: string;
   address?: string;
+  answers?: { question: string; answer: string }[];
+  updatedLabel: string;
+  // Links to this venue's one-activity pages ("CARSA yoga schedule"); featured ones also show in the hero.
+  activityPages?: { href: string; label: string; count: number; featured?: boolean }[];
+  // On a one-activity page every session is the same sport, so the sport chips are noise.
+  hideSportFilter?: boolean;
   alternatives?: ClosureAlternativeGroup[];
   initialQuery?: ScheduleQuery;
   initialNow: string;
@@ -57,8 +64,13 @@ export default function VenueScheduleClient({
   municipality,
   closure,
   searchName,
+  pageHeading,
   summary,
   address,
+  answers = [],
+  updatedLabel,
+  activityPages = [],
+  hideSportFilter = false,
   alternatives = [],
   initialQuery = {},
   initialNow,
@@ -184,13 +196,20 @@ export default function VenueScheduleClient({
     </section>
   ) : null;
 
+  const answerItems = answers.map((item) => (
+    <article key={item.question} className="schedule-guide-item">
+      <h3>{item.question}</h3>
+      <p>{item.answer}</p>
+    </article>
+  ));
+
   if (closure && events.length === 0) {
     return (
       <>
         <section className="hero" style={{ paddingTop: "3rem" }}>
           <div className="chip-group-label">{municipality}</div>
           <h1>
-            <strong>{venueName}</strong>
+            <strong>{pageHeading}</strong>
           </h1>
           <p className="hero-subtitle">
             {venueName} is {closureHeadline(closure).toLowerCase()}, so there are no swim or fitness schedules to
@@ -198,6 +217,12 @@ export default function VenueScheduleClient({
           </p>
         </section>
         {closureNotice}
+        {answerItems.length > 0 ? (
+          <section className="schedule-guide" aria-labelledby="schedule-guide-title">
+            <h2 id="schedule-guide-title" className="section-title">Quick answers</h2>
+            <div className="schedule-guide-grid">{answerItems}</div>
+          </section>
+        ) : null}
         {alternativesSection}
       </>
     );
@@ -209,9 +234,20 @@ export default function VenueScheduleClient({
       <section className="hero venue-hero">
         <div className="chip-group-label">{municipality}</div>
         <h1>
-          <strong>{venueName}</strong>
+          <strong>{pageHeading}</strong>
         </h1>
-        {searchName ? <p className="venue-aka">Also known as {searchName}</p> : null}
+        {pageHeading.includes(venueName) ? (
+          searchName ? <p className="venue-aka">Also known as {searchName}</p> : null
+        ) : (
+          <p className="venue-aka">{venueName}</p>
+        )}
+        {activityPages
+          .filter((page) => page.featured)
+          .map((page) => (
+            <a key={page.href} href={page.href} className="inline-link venue-featured-link">
+              {page.label} schedule
+            </a>
+          ))}
         {address ? (
           <a
             className="venue-address"
@@ -254,36 +290,38 @@ export default function VenueScheduleClient({
         </div>
       </section>
 
-      <section className="simple-activity-row">
-        <div className="chip-group-label">Sports</div>
-        <div className="horizontal-scroller">
-          <button
-            className={`chip emoji-chip ${activeSport === "" ? "active" : ""}`}
-            onClick={() => setActiveSport("")}
-            type="button"
-          >
-            <GenericSportIcon width="18" height="18" />
-            <span>All</span>
-          </button>
-          {sportCounts.map(([sport, count]) => {
-            const Icon = SPORT_ICON_COMPONENTS[sport] || GenericSportIcon;
-            const meta = getSportMeta(sport);
-            return (
-              <button
-                key={sport}
-                className={`chip emoji-chip sport-chip ${activeSport === sport ? "active" : ""}`}
-                onClick={() => setActiveSport(activeSport === sport ? "" : sport)}
-                type="button"
-                style={{ color: activeSport === sport ? undefined : meta.color }}
-              >
-                <Icon width="18" height="18" />
-                <span>{meta.label}</span>
-                <span className="emoji-chip-count">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {hideSportFilter ? null : (
+        <section className="simple-activity-row">
+          <div className="chip-group-label">Sports</div>
+          <div className="horizontal-scroller">
+            <button
+              className={`chip emoji-chip ${activeSport === "" ? "active" : ""}`}
+              onClick={() => setActiveSport("")}
+              type="button"
+            >
+              <GenericSportIcon width="18" height="18" />
+              <span>All</span>
+            </button>
+            {sportCounts.map(([sport, count]) => {
+              const Icon = SPORT_ICON_COMPONENTS[sport] || GenericSportIcon;
+              const meta = getSportMeta(sport);
+              return (
+                <button
+                  key={sport}
+                  className={`chip emoji-chip sport-chip ${activeSport === sport ? "active" : ""}`}
+                  onClick={() => setActiveSport(activeSport === sport ? "" : sport)}
+                  type="button"
+                  style={{ color: activeSport === sport ? undefined : meta.color }}
+                >
+                  <Icon width="18" height="18" />
+                  <span>{meta.label}</span>
+                  <span className="emoji-chip-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="simple-activity-row">
         <div className="chip-group-label">Activity Types</div>
@@ -362,6 +400,25 @@ export default function VenueScheduleClient({
             <div className="status-number">{upcoming[0] ? formatMonthDay(upcoming[0].start_time) : "-"}</div>
             <div className="status-copy">Earliest upcoming session</div>
           </div>
+        </div>
+        {activityPages.length > 0 ? (
+          <nav className="venue-activity-links" aria-label={`${searchName || venueName} schedules by activity`}>
+            {activityPages.map((page) => (
+              <a key={page.href} href={page.href} className="chip">
+                {page.label} <span className="emoji-chip-count">{page.count}</span>
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        <div className="schedule-guide-grid">
+          {answerItems}
+          <article className="schedule-guide-item">
+            <h3>How current is this {searchName || venueName} schedule?</h3>
+            <p>
+              Schedule data was updated {updatedLabel}. Times can change, so use the booking link on an activity
+              for registration details and final availability.
+            </p>
+          </article>
         </div>
       </section>
     </>

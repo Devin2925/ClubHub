@@ -104,6 +104,18 @@ export function FitnessIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+export function YogaIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="5" r="2" />
+      <path d="M12 8v6" />
+      <path d="M5 9.5l7 2.5 7-2.5" />
+      <path d="M4.5 18.5c2.5-2.3 4.8-3.5 7.5-3.5s5 1.2 7.5 3.5" />
+      <path d="M8 19.5h8" />
+    </svg>
+  );
+}
+
 export function ArcheryIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -223,6 +235,7 @@ export const SPORT_ICON_COMPONENTS: Record<string, React.ComponentType<React.SVG
   skating: SkatingIcon,
   swimming: SwimmerIcon,
   fitness: FitnessIcon,
+  yoga: YogaIcon,
   archery: ArcheryIcon,
   arts: ArtsIcon,
   kids: KidsIcon,

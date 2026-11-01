@@ -3,6 +3,7 @@ import html
 import re
 from datetime import date, datetime, timedelta
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 import requests
 from pypdf import PdfReader
@@ -48,20 +49,25 @@ class CookStreetPDFScraper(BaseScraper):
 
         calendar_url = ""
         guide_url = ""
-        current = datetime.utcnow()
-        current_label = current.strftime("%B %Y")
+        # Victoria's month, not UTC's: on the evening of the 31st UTC is already next month.
+        current_label = datetime.now(ZoneInfo("America/Vancouver")).strftime("%B %Y")
+        monthly = {}
         for url in urls:
             lowered = url.lower()
             if "program guide" in lowered and ".pdf" in lowered:
                 guide_url = url
             if f"{current_label}.pdf" in url:
                 calendar_url = url
+            # Monthly calendars are named "October 2026.pdf"; the page also links flyers.
+            label = re.search(r"([A-Z][a-z]+ \d{4})\.pdf$", url)
+            if label:
+                try:
+                    monthly[datetime.strptime(label.group(1), "%B %Y")] = url
+                except ValueError:
+                    pass
 
-        if not calendar_url:
-            for url in urls:
-                if url.endswith(".pdf") and "Program Guide.pdf" not in url:
-                    calendar_url = url
-                    break
+        if not calendar_url and monthly:
+            calendar_url = monthly[max(monthly)]
 
         if not calendar_url or not guide_url:
             raise ValueError("Could not discover Cook Street PDF URLs")

@@ -66,6 +66,7 @@ const popularSchedules = [
   { href: "/venues/henderson-recreation-centre", label: "Henderson Rec Centre schedule" },
   { href: "/venues/saanich-commonwealth-place", label: "Commonwealth Pool schedule" },
   { href: "/venues/carsa-vikes-recreation", label: "CARSA drop-in schedule" },
+  { href: "/venues/carsa-vikes-recreation/yoga", label: "CARSA yoga schedule" },
   { href: "/venues/g-r-pearkes-recreation-centre", label: "Pearkes Rec Centre skating" },
   { href: "/venues/fairfield-community-place", label: "Fairfield Community Centre" },
   { href: "/venues/crystal-pool-and-fitness-centre", label: "Crystal Pool closure & alternatives" },

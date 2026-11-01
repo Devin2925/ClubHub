@@ -1,0 +1,133 @@
+import Link from "next/link";
+import { Metadata } from "next";
+import { notFound } from "next/navigation";
+import VenueScheduleClient from "../../../components/VenueScheduleClient";
+import { DEMO_MODE } from "../../../lib/demo";
+import { getDemoEvents } from "../../../lib/snapshot.server";
+import { readDateParam, readParam } from "../../../lib/schedule";
+import { API_BASE, EventData, getSportMeta, nowScheduleKey, SPORT_META, venueSlug } from "../../../lib/utils";
+import {
+  getVenueSearchName,
+  getVenueSnapshot,
+  getVenueSportSeo,
+  MIN_VENUE_SPORT_SESSIONS,
+  serializeJsonLd,
+  SITE_NAME,
+  SITE_URL,
+  snapshotUpdatedLabel,
+  venueSportCounts,
+} from "../../../lib/seo";
+
+type Props = {
+  params: Promise<{ venue: string; sport: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+// One activity at one venue, e.g. /venues/carsa-vikes-recreation/yoga for "carsa yoga".
+function pageCopy(venue: string, sport: string) {
+  const venueData = getVenueSnapshot(venue);
+  const displayName = getVenueSearchName(venue) || venueData.venueName;
+  const label = getSportMeta(sport).label;
+  const count = venueSportCounts(venue).find(([type]) => type === sport)?.[1] || 0;
+  const seo = getVenueSportSeo(venue, sport);
+  return {
+    ...venueData,
+    displayName,
+    label,
+    count,
+    seo,
+    title: seo?.metaTitle || `${displayName} ${label} Schedule`,
+    heading: seo?.heading || `${displayName} ${label.toLowerCase()} schedule`,
+    summary:
+      seo?.summary ||
+      `Upcoming ${label.toLowerCase()} sessions at ${venueData.venueName} in ${venueData.municipality}, BC, with times and booking links.`,
+  };
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { venue, sport } = await params;
+  const page = pageCopy(venue, sport);
+  const updated = `Updated ${snapshotUpdatedLabel()}.`;
+  const description = `${
+    page.seo?.metaDescription ||
+    `${page.count} upcoming ${page.label.toLowerCase()} sessions at ${page.venueName} in ${page.municipality}, BC. See today's times, dates and drop-in details.`
+  } ${updated}`;
+  const url = `/venues/${venue}/${sport}`;
+
+  return {
+    title: page.title,
+    description,
+    keywords: [
+      `${page.displayName} ${page.label.toLowerCase()}`,
+      `${page.displayName} ${page.label.toLowerCase()} schedule`,
+      `${page.venueName} ${page.label.toLowerCase()}`,
+      `${page.label.toLowerCase()} ${page.municipality}`,
+    ],
+    robots: page.count >= MIN_VENUE_SPORT_SESSIONS ? undefined : { index: false, follow: true },
+    openGraph: { title: `${page.title} | ${SITE_NAME}`, description, type: "website", url },
+    twitter: { card: "summary", title: `${page.title} | ${SITE_NAME}`, description },
+    alternates: { canonical: url },
+  };
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function VenueSportPage({ params, searchParams }: Props) {
+  const { venue, sport } = await params;
+  if (!SPORT_META[sport] || sport === "other") notFound();
+  const query = await searchParams;
+  const initialQuery = {
+    date: query.date === undefined ? undefined : readDateParam(readParam(query.date)),
+    type: readParam(query.type) || undefined,
+  };
+
+  let allEvents: EventData[] = [];
+  if (DEMO_MODE) {
+    allEvents = getDemoEvents();
+  } else {
+    const response = await fetch(`${API_BASE}/api/events`, { cache: "no-store" });
+    const data = await response.json();
+    allEvents = data.events || [];
+  }
+  const events = allEvents
+    .filter((event) => venueSlug(event.venue_name) === venue && event.sport_type === sport)
+    .map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
+  if (events.length === 0 && !getVenueSportSeo(venue, sport)) notFound();
+
+  const page = pageCopy(venue, sport);
+  const venueUrl = `${SITE_URL}/venues/${venue}`;
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Rec Centres", item: `${SITE_URL}/venues` },
+      { "@type": "ListItem", position: 3, name: page.venueName, item: venueUrl },
+      { "@type": "ListItem", position: 4, name: page.label, item: `${venueUrl}/${sport}` },
+    ],
+  };
+
+  return (
+    <main className="page">
+      <div className="container">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
+        <Link href={`/venues/${venue}`} className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
+          All {page.displayName} activities
+        </Link>
+        <VenueScheduleClient
+          events={events}
+          venueName={page.venueName}
+          municipality={page.municipality}
+          searchName={getVenueSearchName(venue)}
+          pageHeading={page.heading}
+          summary={page.summary}
+          answers={page.seo?.answers}
+          updatedLabel={snapshotUpdatedLabel()}
+          hideSportFilter
+          initialQuery={initialQuery}
+          initialNow={nowScheduleKey()}
+        />
+      </div>
+    </main>
+  );
+}

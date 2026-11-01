@@ -729,6 +729,32 @@ button {
   margin-top: -0.25rem;
 }
 
+.schedule-guide {
+  margin: 0 0 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.schedule-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 1rem 1.5rem;
+  margin-top: 1rem;
+}
+
+.schedule-guide-item h3 {
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.schedule-guide-item p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .closure-inline-note {
   margin: 0.9rem 0 1.25rem;
   padding-left: 0.75rem;
@@ -1397,4 +1423,18 @@ a.venue-address {
   .trust-strip-footer .trust-card {
     display: block;
   }
+}
+
+.venue-activity-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+}
+
+.venue-featured-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  margin-right: 1rem;
+  font-weight: 600;
 }

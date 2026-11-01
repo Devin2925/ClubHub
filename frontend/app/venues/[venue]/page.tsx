@@ -15,8 +15,13 @@ import {
   getVenueSearchName,
   getVenueSeo,
   getVenueSnapshot,
+  getVenueSportSeo,
+  MIN_VENUE_SPORT_SESSIONS,
+  serializeJsonLd,
   SITE_NAME,
   snapshotUpdatedLabel,
+  venuePageHeading,
+  venueSportCounts,
 } from "../../lib/seo";
 import { closureHeadline, getVenueClosure } from "../../lib/closures";
 
@@ -30,17 +35,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const venueData = getVenueSnapshot(resolvedParams.venue);
   const seo = getVenueSeo(resolvedParams.venue);
   const searchName = seo?.searchName;
-  const displayTitle = searchName ? `${venueData.venueName} (${searchName})` : venueData.venueName;
+  const displayTitle = searchName || venueData.venueName;
   const closure = getVenueClosure(resolvedParams.venue);
-  const activities = venueData.sportLabels.slice(0, 2).join(" & ");
   const updated = `Updated ${snapshotUpdatedLabel()}.`;
-  const title = closure
-    ? `${displayTitle} Schedule: ${closureHeadline(closure)}`
-    : `${displayTitle} Schedule: ${activities ? `${activities} ` : ""}Drop-Ins in ${venueData.municipality}`;
+  const title =
+    seo?.metaTitle ||
+    (closure
+      ? `${displayTitle} Schedule: ${closureHeadline(closure)}`
+      : `${displayTitle} Drop-In Schedule`);
   const description = closure
-    ? `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. See nearby pool swim times and the interim Victoria Recreation Centre plans. ${updated}`
+    ? `${seo?.metaDescription || seo?.summary || `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. See nearby pool swim times and the interim Victoria Recreation Centre plans.`} ${updated}`
     : seo && venueData.eventCount > 0
-      ? `${seo.summary} ${venueData.eventCount} upcoming sessions with times and dates. ${updated}`
+      ? `${seo.metaDescription || `${seo.summary} ${venueData.eventCount} upcoming sessions with times and dates.`} ${updated}`
       : venueData.eventCount > 0
         ? `${displayTitle} drop-in schedule: ${venueData.eventCount} upcoming activities in ${venueData.municipality}, BC. Browse ${venueData.sportLabels.join(", ") || "drop-ins and classes"} with times and dates on ${SITE_NAME}. ${updated}`
         : `See upcoming drop-ins, classes, and recreation schedules at ${displayTitle} in ${venueData.municipality}, BC on ${SITE_NAME}.`;
@@ -53,14 +59,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       `${venueData.venueName} Victoria BC`,
       `${venueData.venueName} drop-in`,
       ...(searchName ? [`${searchName} schedule`, `${searchName} drop-in`] : []),
+      ...(seo?.alternateNames || []).flatMap((name) => [`${name} schedule`, `${name} drop-in`]),
       `${venueData.municipality} recreation centre`,
       `${SITE_NAME} ${displayTitle}`,
     ],
+    robots: venueData.eventCount > 0 || closure ? undefined : { index: false, follow: true },
     openGraph: {
-      title,
+      title: `${title} | ${SITE_NAME}`,
       description,
       type: "website",
       url: `/venues/${resolvedParams.venue}`,
+    },
+    twitter: {
+      card: "summary",
+      title: `${title} | ${SITE_NAME}`,
+      description,
     },
     alternates: {
       canonical: `/venues/${resolvedParams.venue}`,
@@ -95,11 +108,22 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
   const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
   const seo = getVenueSeo(resolvedParams.venue);
   const searchName = getVenueSearchName(resolvedParams.venue);
+  const pageHeading = venuePageHeading(resolvedParams.venue, venueName);
+  const activityPages = venueSportCounts(resolvedParams.venue)
+    .filter(([, count]) => count >= MIN_VENUE_SPORT_SESSIONS)
+    .map(([sport, count]) => ({
+      href: `/venues/${resolvedParams.venue}/${sport}`,
+      label: `${searchName || venueName} ${getSportMeta(sport).label.toLowerCase()}`,
+      count,
+      featured: Boolean(getVenueSportSeo(resolvedParams.venue, sport)),
+    }));
   const venueJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsActivityLocation",
     name: venueName,
-    ...(searchName ? { alternateName: searchName } : {}),
+    ...(searchName || seo?.alternateNames?.length
+      ? { alternateName: [searchName, ...(seo?.alternateNames || [])].filter(Boolean) }
+      : {}),
     url: `https://clubhubvictoria.ca/venues/${resolvedParams.venue}`,
     address: {
       "@type": "PostalAddress",
@@ -168,11 +192,11 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
       <div className="container">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(venueJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(venueJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
         />
         <Link href="/venues" className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
           Back to venue list
@@ -183,8 +207,12 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
           municipality={municipality}
           closure={closure}
           searchName={searchName}
+          pageHeading={pageHeading}
           summary={seo?.summary}
           address={seo?.address}
+          answers={seo?.answers}
+          updatedLabel={snapshotUpdatedLabel()}
+          activityPages={activityPages}
           alternatives={alternatives}
           initialQuery={initialQuery}
           initialNow={now}

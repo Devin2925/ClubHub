@@ -25,6 +25,7 @@ SPORT_PATTERNS = [
         r"lessons\s*&\s*leisure",
         "swimming",
     ),
+    (r"yoga|vinyasa|\byin\b|hatha|iyengar|ashtanga", "yoga"),
     (
         r"fitness|weight|cardio|yoga|pilates|zumba|aerobic|body\s*sculpt|hiit|"
         r"circuit|cycle\s*(fit|&|\s*and)|strength|stretch|hi\s*lo|low\s*impact|"
@@ -177,7 +178,7 @@ def classify_offering_type(title: str, description: str = "") -> str:
             return "class"
 
     sport = classify_sport(title)
-    if sport in {"fitness", "swimming", "arts", "kids"}:
+    if sport in {"fitness", "yoga", "swimming", "arts", "kids"}:
         return "class"
     if sport in {"hockey", "pickleball", "badminton", "soccer", "basketball", "volleyball", "squash", "tennis"}:
         return "drop-in"
@@ -304,7 +305,8 @@ class BaseScraper:
                 # Ensure source and municipality are set
                 ev_data.setdefault("source", self.source_id_prefix)
                 ev_data.setdefault("municipality", self.municipality)
-                ev_data["sport_type"] = classify_sport_fields(
+                # A scraper that knows the activity from its source page can say so.
+                ev_data["sport_type"] = ev_data.pop("sport_override", None) or classify_sport_fields(
                     ev_data.get("title", ""),
                     ev_data.get("facility_name", "") or "",
                     ev_data.get("description", "") or "",

@@ -29,6 +29,8 @@ PAGE_CONFIGS = [
         "key": "yoga",
         "url": "https://www.vikesrec.ca/yoga",
         "label": "Yoga",
+        # Class names like "Yang to Yin" or "Steady Fire Flow" don't say yoga.
+        "sport": "yoga",
     },
     {
         "key": "pickleball",
@@ -109,6 +111,26 @@ class VikesRecScraper(BaseScraper):
         if end_dt < start_dt:
             start_dt = datetime(year - 1, start_month, start_day)
         return start_dt, end_dt
+
+    def _extract_holidays(self, html: str) -> set[tuple[int, int]]:
+        # e.g. "Note: There are no programs on Sep. 30, Oct. 12, Nov. 11 due to holidays."
+        note = re.search(r"no\s+programs\s+on\s+(.*?)\s+due\s+to\s+holiday", unescape(html), flags=re.I | re.S)
+        if not note:
+            return set()
+        return {
+            (MONTHS[month[:3].lower()], int(day))
+            for month, day in re.findall(r"([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})", note.group(1))
+            if month[:3].lower() in MONTHS
+        }
+
+    def _extract_prices(self, html: str) -> dict[str, str]:
+        # Class description cards: <h4 id="beginner-yoga">Beginner Yoga</h4><h6>$20 <span>included with membership</span></h6>
+        prices = {}
+        for anchor, price_html in re.findall(r'<h4 id="([^"]+)">.*?</h4>\s*<h6>(.*?)</h6>', html, flags=re.I | re.S):
+            text = " ".join(re.sub(r"<[^>]+>", " ", unescape(price_html)).replace("*", "").split())
+            if text.startswith("$"):
+                prices[anchor] = text.replace(" included with membership", " drop-in, included with membership")
+        return prices
 
     def _extract_tab_html(self, html: str, tab_number: int) -> str:
         start_marker = f"<!-- tab {tab_number} - current schedule starts -->"
@@ -234,6 +256,8 @@ class VikesRecScraper(BaseScraper):
         html = self._fetch(page["url"])
         range_labels = self._extract_range_labels(html)
         tab_ranges = [self._parse_range_label(label) for label in range_labels]
+        holidays = self._extract_holidays(html)
+        prices = self._extract_prices(html)
 
         events = []
         for index, date_range in enumerate(tab_ranges, start=1):
@@ -248,6 +272,8 @@ class VikesRecScraper(BaseScraper):
                 if not entries:
                     continue
                 for event_date in self._dates_for_weekday(date_range[0], date_range[1], weekday):
+                    if (event_date.month, event_date.day) in holidays:
+                        continue
                     for entry in entries:
                         parsed = self._parse_time_range(event_date, entry["time_text"])
                         if not parsed:
@@ -262,20 +288,21 @@ class VikesRecScraper(BaseScraper):
                             ]
                         )
                         source_hash = hashlib.md5(source_key.encode("utf-8")).hexdigest()[:16]
-                        events.append(
-                            {
-                                "source_id": f"{self.source_id_prefix}_{source_hash}",
-                                "title": entry["title"],
-                                "venue_name": self.venue_name,
-                                "facility_name": entry["facility_name"],
-                                "start_time": start_dt,
-                                "end_time": end_dt,
-                                "price": "",
-                                "description": entry["description"],
-                                "booking_url": entry["booking_url"],
-                                "municipality": self.municipality,
-                            }
-                        )
+                        event = {
+                            "source_id": f"{self.source_id_prefix}_{source_hash}",
+                            "title": entry["title"],
+                            "venue_name": self.venue_name,
+                            "facility_name": entry["facility_name"],
+                            "start_time": start_dt,
+                            "end_time": end_dt,
+                            "price": prices.get(entry["booking_url"].rpartition("#")[2], ""),
+                            "description": entry["description"],
+                            "booking_url": entry["booking_url"],
+                            "municipality": self.municipality,
+                        }
+                        if page.get("sport"):
+                            event["sport_override"] = page["sport"]
+                        events.append(event)
         return events
 
     def _parse_clock_time(self, value: str) -> time | None:
