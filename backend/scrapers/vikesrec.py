@@ -17,11 +17,13 @@ PAGE_CONFIGS = [
     },
     {
         "key": "group-fitness",
+        "offering": "class",
         "url": "https://www.vikesrec.ca/group-fitness",
         "label": "Group Fitness",
     },
     {
         "key": "registered-fitness",
+        "offering": "class",
         "url": "https://www.vikesrec.ca/registered-fitness",
         "label": "Registered Fitness",
     },
@@ -31,6 +33,7 @@ PAGE_CONFIGS = [
         "label": "Yoga",
         # Class names like "Yang to Yin" or "Steady Fire Flow" don't say yoga.
         "sport": "yoga",
+        "offering": "class",
     },
     {
         "key": "pickleball",
@@ -130,7 +133,29 @@ class VikesRecScraper(BaseScraper):
             text = " ".join(re.sub(r"<[^>]+>", " ", unescape(price_html)).replace("*", "").split())
             if text.startswith("$"):
                 prices[anchor] = text.replace(" included with membership", " drop-in, included with membership")
+            elif re.match(r"(no charge|free)\b", text, flags=re.I) and re.search(r"student", text, flags=re.I):
+                prices[anchor] = "Free for UVic students & members"
         return prices
+
+    def _extract_class_notes(self, html: str) -> dict[str, str]:
+        """The class card under the schedule, cut to what someone deciding needs:
+        "A fun, energizing blend of ballet-inspired movements... All levels welcome. Youth 13+."
+        """
+        notes = {}
+        for anchor, body in re.findall(r'<h4 id="([^"]+)">.*?</h4>(.*?)(?=<h4 id=|<!--)', html, flags=re.I | re.S):
+            body = re.sub(r"^\s*<h6>.*?</h6>", "", body, count=1, flags=re.I | re.S)  # the price line
+            text = " ".join(re.sub(r"<[^>]+>", " ", unescape(body)).split()).replace("..", ".")
+            text = re.sub(r"^\*+\s*", "", text)
+            youth = re.search(r"Youth welcome\s*:\s*(\d+\+?)", text, flags=re.I)
+            text = re.split(r"\b(?:Youth welcome|Equipment|Instructor|Location|Program availability)\s*:", text, maxsplit=1)[0].strip()
+            if len(text) > 240:
+                cut = text[:240].rsplit(". ", 1)[0]
+                text = (cut if len(cut) > 80 else text[:237].rsplit(" ", 1)[0]) .rstrip(".") + "."
+            if youth:
+                text = f"{text} Ages {youth.group(1)}." if text else f"Ages {youth.group(1)}."
+            if text:
+                notes[anchor] = text
+        return notes
 
     def _extract_tab_html(self, html: str, tab_number: int) -> str:
         start_marker = f"<!-- tab {tab_number} - current schedule starts -->"
@@ -188,19 +213,31 @@ class VikesRecScraper(BaseScraper):
                 facility = re.sub(r"<[^>]+>", "", unescape(facility_match.group(1))).strip()
 
             register_match = re.search(
-                r'<a[^>]+href="([^"]+)"[^>]*>\s*Register\s*</a>',
+                r'<a[^>]+href="([^"]+)"[^>]*>\s*(?:Register|Reserve(?:\s+(?:a|your))?\s+spot)\s*</a>',
                 chunk,
                 flags=re.I | re.S,
             )
             detail_match = re.search(r'<h5>\s*<a[^>]+href="([^"]+)"', chunk, flags=re.I | re.S)
+            anchor = ""
+            if detail_match and "#" in detail_match.group(1):
+                anchor = unescape(detail_match.group(1)).rpartition("#")[2]
             booking_url = page_url
             if register_match:
                 booking_url = unescape(register_match.group(1))
             elif detail_match:
                 booking_url = urljoin(page_url, unescape(detail_match.group(1)))
 
+            # "Badminton (Starts Sep.14)": hold sessions until the start date, drop the note.
+            starts = None
+            starts_match = re.search(r"\s*\(\s*starts?\s+([A-Za-z]{3})[a-z]*\.?\s*(\d{1,2})\s*\)", title, flags=re.I)
+            if starts_match and starts_match.group(1)[:3].lower() in MONTHS:
+                starts = (MONTHS[starts_match.group(1)[:3].lower()], int(starts_match.group(2)))
+                title = (title[: starts_match.start()] + title[starts_match.end():]).strip()
+
             entries.append(
                 {
+                    "anchor": anchor,
+                    "starts": starts,
                     "title": title,
                     "time_text": time_text,
                     "facility_name": facility,
@@ -209,6 +246,29 @@ class VikesRecScraper(BaseScraper):
                 }
             )
         return entries
+
+    @staticmethod
+    def _before_start(event_date: datetime, starts: tuple[int, int]) -> bool:
+        month, day = starts
+        # A September start seen in spring belongs to the coming fall; otherwise this school year.
+        year = event_date.year if month <= event_date.month + 6 else event_date.year - 1
+        try:
+            return event_date.date() < datetime(year, month, day).date()
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _facility_for_day(facility: str, weekday: int) -> str:
+        """'Thursday: Elevate Studio ; Friday: Gwynne Excel Studio' -> the room for that day."""
+        facility = re.sub(r"\bGywnne\b", "Gwynne", facility)
+        parts = re.findall(r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?\s*:\s*([^;]+)", facility, flags=re.I)
+        if not parts:
+            return facility
+        day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][weekday]
+        for name, room in parts:
+            if name[:3].lower() == day:
+                return room.strip()
+        return facility
 
     def _parse_time_range(self, event_date: datetime, time_text: str) -> tuple[datetime, datetime] | None:
         normalized = (
@@ -258,6 +318,7 @@ class VikesRecScraper(BaseScraper):
         tab_ranges = [self._parse_range_label(label) for label in range_labels]
         holidays = self._extract_holidays(html)
         prices = self._extract_prices(html)
+        notes = self._extract_class_notes(html)
 
         events = []
         for index, date_range in enumerate(tab_ranges, start=1):
@@ -275,10 +336,13 @@ class VikesRecScraper(BaseScraper):
                     if (event_date.month, event_date.day) in holidays:
                         continue
                     for entry in entries:
+                        if entry["starts"] and self._before_start(event_date, entry["starts"]):
+                            continue
                         parsed = self._parse_time_range(event_date, entry["time_text"])
                         if not parsed:
                             continue
                         start_dt, end_dt = parsed
+                        facility = self._facility_for_day(entry["facility_name"], weekday)
                         source_key = "|".join(
                             [
                                 page["key"],
@@ -292,16 +356,19 @@ class VikesRecScraper(BaseScraper):
                             "source_id": f"{self.source_id_prefix}_{source_hash}",
                             "title": entry["title"],
                             "venue_name": self.venue_name,
-                            "facility_name": entry["facility_name"],
+                            "facility_name": facility,
                             "start_time": start_dt,
                             "end_time": end_dt,
-                            "price": prices.get(entry["booking_url"].rpartition("#")[2], ""),
-                            "description": entry["description"],
+                            "price": prices.get(entry["anchor"], ""),
+                            "description": notes.get(entry["anchor"], entry["description"]),
                             "booking_url": entry["booking_url"],
                             "municipality": self.municipality,
                         }
                         if page.get("sport"):
                             event["sport_override"] = page["sport"]
+                        if page.get("offering"):
+                            # Class descriptions mention "drop-in" pricing; these are still classes.
+                            event["offering_override"] = page["offering"]
                         events.append(event)
         return events
 

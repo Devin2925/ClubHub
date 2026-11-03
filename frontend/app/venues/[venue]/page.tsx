@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import VenueScheduleClient from "../../components/VenueScheduleClient";
+import CampCard from "../../components/CampCard";
+import { getUpcomingCamps } from "../../lib/campPages.server";
+import { getCampSeason } from "../../lib/camps";
 import { DEMO_MODE } from "../../lib/demo";
-import { getDemoEvents } from "../../lib/snapshot.server";
+import { getDemoEvents, sessionNotes } from "../../lib/snapshot.server";
 import { readDateParam, readParam } from "../../lib/schedule";
 import {
   API_BASE,
@@ -100,9 +103,10 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
     allEvents = data.events || [];
   }
 
-  const events = allEvents
-    .filter((event) => venueSlug(event.venue_name) === resolvedParams.venue)
-    .map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
+  const venueEvents = allEvents
+    .filter((event) => venueSlug(event.venue_name) === resolvedParams.venue);
+  const notes = sessionNotes(venueEvents);
+  const events = venueEvents.map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
   const closure = getVenueClosure(resolvedParams.venue);
   const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
   const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
@@ -162,6 +166,8 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
       })
       .filter((venue) => venue.count > 0),
   }));
+  const venueCamps = getUpcomingCamps().filter((camp) => venueSlug(camp.venue_name) === resolvedParams.venue);
+  const campSeasons = Array.from(new Set(venueCamps.map((camp) => camp.season)));
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -214,9 +220,33 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
           updatedLabel={snapshotUpdatedLabel()}
           relatedLinks={relatedLinks}
           alternatives={alternatives}
+          notes={notes}
           initialQuery={initialQuery}
           initialNow={now}
         />
+        {venueCamps.length ? (
+          <section className="venue-camps" id="camps">
+            <h2 className="section-title">Kids camps at {searchName || venueName}</h2>
+            <p className="section-copy">
+              {venueCamps.length} upcoming {venueCamps.length === 1 ? "camp" : "camps"} with dates, ages and spots left. More
+              across Greater Victoria:{" "}
+              {campSeasons.map((season, index) => (
+                <span key={season}>
+                  {index ? ", " : ""}
+                  <Link href={`/camps/${season}`} className="inline-link">
+                    {getCampSeason(season)?.searchName.toLowerCase()}
+                  </Link>
+                </span>
+              ))}
+              .
+            </p>
+            <div className="camp-grid">
+              {venueCamps.slice(0, 12).map((camp) => (
+                <CampCard key={camp.id} camp={{ ...camp, venueHref: undefined }} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

@@ -52,6 +52,8 @@ interface VenueScheduleClientProps {
   relatedLinks?: { href: string; label: string; count?: number; featured?: boolean }[];
   // On a one-activity page every session is the same sport, so the sport chips are noise.
   hideSportFilter?: boolean;
+  // What each class is, keyed by session title; sent once per title instead of per session.
+  notes?: Record<string, string>;
   alternatives?: ClosureAlternativeGroup[];
   initialQuery?: ScheduleQuery;
   initialNow: string;
@@ -87,6 +89,7 @@ export default function VenueScheduleClient({
   updatedLabel,
   relatedLinks = [],
   hideSportFilter = false,
+  notes,
   alternatives = [],
   initialQuery = {},
   initialNow,
@@ -182,11 +185,12 @@ export default function VenueScheduleClient({
     ).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEvents]);
 
+  const activeDateLabel = activeDate ? formatFullDate(`${activeDate}T00:00:00`).replace(/, \d{4}$/, "") : "";
   const viewLabel =
     activeDate === todayKey
-      ? "Today"
+      ? `Today, ${activeDateLabel.replace(/^\w+, /, "")}`
       : activeDate
-        ? formatFullDate(`${activeDate}T00:00:00`).replace(/, \d{4}$/, "")
+        ? activeDateLabel
         : "All upcoming dates";
 
   const closureNotice = closure ? (
@@ -413,7 +417,13 @@ export default function VenueScheduleClient({
             )}
             <div className="events-list">
               {dayEvents.map((event) => (
-                <EventCard key={event.id} event={event} happeningNow={isHappeningNow(event, now)} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  happeningNow={isHappeningNow(event, now)}
+                  hideVenue={!loadFilter}
+                  note={notes?.[event.title]}
+                />
               ))}
             </div>
           </div>

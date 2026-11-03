@@ -53,6 +53,8 @@ export default async function SportDetailPage({ params, searchParams }: Props) {
   const venueNames = page.venues.map(([name]) => name);
 
   const relatedLinks = [
+    // Kids' sessions include camp days; the full camp listings live on /camps.
+    ...(sport === "kids" ? [{ href: "/camps", label: "Kids camps", featured: true }] : []),
     ...activityPages()
       .filter((activity) => activity.sport === sport)
       .map((activity) => ({

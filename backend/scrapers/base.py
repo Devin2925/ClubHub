@@ -27,7 +27,7 @@ SPORT_PATTERNS = [
     ),
     (r"yoga|vinyasa|\byin\b|hatha|iyengar|ashtanga", "yoga"),
     (
-        r"fitness|weight|cardio|yoga|pilates|zumba|aerobic|body\s*sculpt|hiit|"
+        r"fitness|weight|cardio|yoga|pilates|barre|zumba|aerobic|body\s*sculpt|hiit|"
         r"circuit|cycle\s*(fit|&|\s*and)|strength|stretch|hi\s*lo|low\s*impact|"
         r"step\s*\*|trx|partyfit|core\s*(and|&|\s*more)|conditioning|rowing|"
         r"body\s*fit|triple\s*fit|boot\s*camp|spin|interval|fit\b|combo\s*fit|"
@@ -311,10 +311,12 @@ class BaseScraper:
                     ev_data.get("facility_name", "") or "",
                     ev_data.get("description", "") or "",
                 )
-                ev_data["offering_type"] = classify_offering_type(
+                ev_data["offering_type"] = ev_data.pop("offering_override", None) or classify_offering_type(
                     ev_data.get("title", ""),
                     ev_data.get("description", "") or "",
                 )
+                if ev_data["offering_type"] == "camp" and ev_data["sport_type"] == "other":
+                    ev_data["sport_type"] = "kids"
                 ev_data["registration_required"] = classify_registration_required(
                     ev_data.get("title", ""),
                     ev_data.get("description", "") or "",

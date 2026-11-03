@@ -4,6 +4,7 @@ import { venueSlug } from "./lib/utils";
 import { VENUE_CLOSURES } from "./lib/closures";
 import { venueSportPages } from "./lib/seo";
 import { activityPages, areaPages, sportPages } from "./lib/searchPages";
+import { CAMP_SEASONS } from "./lib/camps";
 
 const siteUrl = "https://clubhubvictoria.ca";
 
@@ -13,8 +14,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const eventRows = snapshot.events || [];
   const venueSet = new Set<string>();
 
+  // Venues that only appear as a camp location (a school gym, a stable) have no
+  // schedule worth a page of their own; their camps are on /camps.
   for (const event of eventRows) {
-    if (event.venue_name) {
+    if (event.venue_name && event.offering_type !== "camp") {
       venueSet.add(venueSlug(event.venue_name));
     }
   }
@@ -79,6 +82,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     }));
 
+  const campUrls = CAMP_SEASONS.map(({ slug }) => ({
+    url: `${siteUrl}/camps/${slug}`,
+    lastModified: snapshotModified,
+    changeFrequency: "daily" as const,
+    priority: 0.8,
+  }));
+
   const landingUrls = [
     ...areaPages().map(({ slug }) => `/areas/${slug}`),
     ...activityPages().map(({ sport, slug }) => `/sports/${sport}/${slug}`),
@@ -89,5 +99,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...landingUrls, ...sportUrls, ...venuePages, ...venueSportUrls];
+  return [...staticPages, ...campUrls, ...landingUrls, ...sportUrls, ...venuePages, ...venueSportUrls];
 }

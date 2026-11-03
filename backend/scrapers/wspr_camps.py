@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 import requests
 
 from scrapers.base import BaseScraper, strip_html
+from scrapers.camp_utils import ages_from_title, camp_row, spots_label
 
 
 BASE_URL = "https://explore.wspr.ca"
@@ -86,6 +87,7 @@ class WSPRCampsScraper(BaseScraper):
         price = self._badge_value(block, "d-price")
         spaces = self._badge_value(block, "d-spaces")
         date_str = self._badge_value(block, "d-start")
+        end_date_str = self._badge_value(block, "d-end")
 
         row_match = re.search(r"<tbody>\s*<tr>\s*(.*?)\s*</tr>", block, flags=re.S)
         cells = re.findall(r"<td[^>]*>(.*?)</td>", row_match.group(1), flags=re.S) if row_match else []
@@ -96,32 +98,42 @@ class WSPRCampsScraper(BaseScraper):
         end_str = self._text(cells[2])
         location = self._text(cells[4])
         venue = self._text(cells[5]) or "West Shore Parks & Recreation"
+        if venue.lower() == "other" and location:
+            venue = location  # Off-site camps (Cedar Vista Stables) list the place as the room.
         parsed = self._parse_time_range(date_str, start_str, end_str)
         if not parsed:
             return None
 
         start_time, end_time = parsed
+        last_day = None
+        if end_date_str:
+            try:
+                last_day = datetime.strptime(end_date_str, "%a, %d-%b-%y")
+            except ValueError:
+                last_day = None
         description = self._attr(block, "data-course-description")
         alert = self._attr(block, "data-course-alert")
-        description_parts = [part for part in [description, f"Spaces: {spaces}" if spaces else "", alert] if part]
 
         booking_path = f"/Westshore/public/booking/CourseDetails/{course_id}" if course_id else page_url
         raw_key = "|".join([course_id, title, date_str, start_str, end_str, venue, location])
         source_hash = hashlib.md5(raw_key.encode("utf-8")).hexdigest()[:16]
+        open_spots = int(spaces) if spaces.isdigit() else None
 
-        return {
-            "source_id": f"{self.source_id_prefix}_{course_id or source_hash}",
-            "title": title,
-            "venue_name": venue,
-            "facility_name": location,
-            "start_time": start_time,
-            "end_time": end_time,
-            "price": price,
-            "description": self._text(" ".join(description_parts)),
-            "booking_url": urljoin(BASE_URL, booking_path),
-            "source": self.source_id_prefix,
-            "municipality": self.municipality,
-        }
+        return camp_row(
+            source_id=f"{self.source_id_prefix}_{course_id or source_hash}",
+            title=title,
+            venue_name=venue,
+            facility_name=location,
+            start_time=start_time,
+            end_time=end_time,
+            last_day=last_day,
+            price=price,
+            description=self._text(" ".join(part for part in [description, alert] if part)),
+            booking_url=urljoin(BASE_URL, booking_path),
+            availability=spots_label(open_spots),
+            ages=ages_from_title(title),
+            municipality=self.municipality,
+        )
 
     def _parse_page(self, page_url: str) -> list[dict]:
         response = self.session.get(page_url, timeout=30)

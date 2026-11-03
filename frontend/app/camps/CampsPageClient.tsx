@@ -1,264 +1,221 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import EventCard from "../components/EventCard";
-import { DEMO_MODE } from "../lib/demo";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import CampCard from "../components/CampCard";
 import {
-  API_BASE,
-  DISPLAY_TIME_ZONE,
-  EventData,
-  formatFullDate,
-  getDateKey,
-} from "../lib/utils";
+  AGE_FILTERS,
+  CAMP_SEASONS,
+  campFitsAge,
+  campIsFull,
+  type CampSeason,
+} from "../lib/camps";
+import { formatFullDate, getDateKey } from "../lib/utils";
+import type { CampListing, CampProviderRow } from "../lib/campPages.server";
 
-interface CampSource {
-  source_key: string;
-  name: string;
-  municipality: string;
-  venue_names: string[];
-  primary_url: string;
-  registration_url: string;
-  automation_status: "active" | "partial" | "planned";
-  scrape_strategy: string;
-  tags: string[];
+interface Props {
+  camps: CampListing[];
+  providers: CampProviderRow[];
+  // A season page shows one break; the hub shows them all with season tabs.
+  season?: CampSeason;
+  seasonCounts: Partial<Record<CampSeason, number>>;
 }
 
-interface CampSourcePayload {
-  sources: CampSource[];
-  summary?: {
-    total: number;
-    active: number;
-    partial: number;
-    planned: number;
-  };
+function areaName(municipality: string) {
+  return municipality === "Panorama" ? "Saanich Peninsula" : municipality;
 }
 
-export interface DemoCampData {
-  events: EventData[];
-  sources: CampSource[];
-}
+export default function CampsPageClient({ camps, providers, season, seasonCounts }: Props) {
+  const [activeSeason, setActiveSeason] = useState<CampSeason | "">(season || "");
+  const [area, setArea] = useState("");
+  const [age, setAge] = useState("");
+  const [openOnly, setOpenOnly] = useState(false);
+  const [search, setSearch] = useState("");
 
-export default function CampsPageClient({ demo }: { demo: DemoCampData | null }) {
-  const [events, setEvents] = useState<EventData[]>(() => demo?.events || []);
-  const [sources, setSources] = useState<CampSource[]>(() => demo?.sources || []);
-  const [summary, setSummary] = useState<CampSourcePayload["summary"] | null>(() =>
-    demo ? buildCampSourceSummary(demo.sources) : null
+  const areas = useMemo(
+    () => Array.from(new Set(camps.map((camp) => camp.municipality))).sort((a, b) => areaName(a).localeCompare(areaName(b))),
+    [camps]
   );
-  const [loading, setLoading] = useState(!DEMO_MODE);
-  const [activeMunicipality, setActiveMunicipality] = useState("");
-  const [activeStatus, setActiveStatus] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    if (DEMO_MODE) return;
-    async function fetchCamps() {
-      try {
-        const [campRes, sourceRes] = await Promise.all([
-          fetch(`${API_BASE}/api/camps`),
-          fetch(`${API_BASE}/api/camp-sources`),
-        ]);
-        const campData = await campRes.json();
-        const sourceData = (await sourceRes.json()) as CampSourcePayload;
-        setEvents(campData.events || []);
-        setSources(sourceData.sources || []);
-        setSummary(sourceData.summary || null);
-      } catch (error) {
-        console.error("Failed to load camps", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCamps();
-  }, []);
-
-  const sourceMunicipalities = useMemo(() => {
-    return Array.from(new Set(sources.map((source) => source.municipality))).sort();
-  }, [sources]);
-
-  const filteredSources = useMemo(() => {
-    const needle = searchTerm.trim().toLowerCase();
-    return sources.filter((source) => {
-      if (activeMunicipality && source.municipality !== activeMunicipality) return false;
-      if (activeStatus && source.automation_status !== activeStatus) return false;
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return camps.filter((camp) => {
+      if (activeSeason && camp.season !== activeSeason) return false;
+      if (area && camp.municipality !== area) return false;
+      if (age && !campFitsAge(camp, age)) return false;
+      if (openOnly && campIsFull(camp)) return false;
       if (!needle) return true;
-      return [
-        source.name,
-        source.municipality,
-        source.venue_names.join(" "),
-        source.tags.join(" "),
-      ]
+      return [camp.title, camp.venue_name, camp.provider, camp.municipality, camp.description]
         .join(" ")
         .toLowerCase()
         .includes(needle);
     });
-  }, [activeMunicipality, activeStatus, searchTerm, sources]);
+  }, [camps, activeSeason, area, age, openOnly, search]);
 
-  const groupedEvents = useMemo(() => {
-    return Object.entries(
-      events.reduce<Record<string, EventData[]>>((groups, event) => {
-        const key = getDateKey(event.start_time);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(event);
-        return groups;
-      }, {})
-    ).sort(([a], [b]) => a.localeCompare(b));
-  }, [events]);
+  // Grouped by break, then by the week (or day) a camp starts.
+  const groups = useMemo(() => {
+    const bySeason = CAMP_SEASONS.map((info) => {
+      const list = filtered.filter((camp) => camp.season === info.slug);
+      const byDay = new Map<string, CampListing[]>();
+      for (const camp of list) {
+        const key = getDateKey(camp.start_time);
+        byDay.set(key, [...(byDay.get(key) || []), camp]);
+      }
+      return { info, days: Array.from(byDay.entries()), count: list.length };
+    });
+    return bySeason.filter((group) => group.count > 0);
+  }, [filtered]);
 
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="container loading-block">Loading camps...</div>
-      </main>
-    );
-  }
+  const filtersActive = Boolean(area || age || openOnly || search || (!season && activeSeason));
 
   return (
-    <main className="page">
-      <div className="container">
-        <section className="hero hero-simple">
-          <div className="chip-group-label">Greater Victoria</div>
-          <h1>
-            Find <strong>kids camps</strong> around Victoria
-          </h1>
-          <p className="hero-subtitle">
-            Summer camps, Pro-D day camps, spring break camps, arts, STEM, sports, outdoor adventure, and school-break care from municipal and independent providers.
-          </p>
-
-          <div className="status-strip status-strip-wide">
-            <div className="status-card">
-              <div className="status-kicker">Upcoming</div>
-              <div className="status-number">{events.length}</div>
-              <div className="status-copy">Camp sessions in cache</div>
-            </div>
-            <div className="status-card">
-              <div className="status-kicker">Sources</div>
-              <div className="status-number">{summary?.total ?? sources.length}</div>
-              <div className="status-copy">Camp providers tracked</div>
-            </div>
-            <div className="status-card">
-              <div className="status-kicker">Automated</div>
-              <div className="status-number">{summary?.active ?? 0}</div>
-              <div className="status-copy">Already in sync pipeline</div>
-            </div>
-            <div className="status-card">
-              <div className="status-kicker">Time Zone</div>
-              <div className="status-number">PT</div>
-              <div className="status-copy">Times shown in {DISPLAY_TIME_ZONE}</div>
-            </div>
+    <>
+      <section className="camp-filters" aria-label="Filter camps">
+        {season ? null : (
+          <div className="chip-row" role="tablist" aria-label="School break">
+            <button type="button" className={`chip ${activeSeason === "" ? "active" : ""}`} onClick={() => setActiveSeason("")}>
+              All camps {camps.length}
+            </button>
+            {CAMP_SEASONS.filter((info) => seasonCounts[info.slug]).map((info) => (
+              <button
+                key={info.slug}
+                type="button"
+                className={`chip ${activeSeason === info.slug ? "active" : ""}`}
+                onClick={() => setActiveSeason(activeSeason === info.slug ? "" : info.slug)}
+              >
+                {info.label} {seasonCounts[info.slug]}
+              </button>
+            ))}
           </div>
-        </section>
+        )}
+        <div className="chip-row" aria-label="Age">
+          {AGE_FILTERS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`chip ${age === item.key ? "active" : ""}`}
+              onClick={() => setAge(age === item.key ? "" : item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+          <button type="button" className={`chip ${openOnly ? "active" : ""}`} onClick={() => setOpenOnly(!openOnly)}>
+            Spots open
+          </button>
+        </div>
+        <div className="camp-filter-fields">
+          <select className="filter-select" value={area} onChange={(event) => setArea(event.target.value)} aria-label="Area">
+            <option value="">All areas</option>
+            {areas.map((name) => (
+              <option key={name} value={name}>
+                {areaName(name)}
+              </option>
+            ))}
+          </select>
+          <input
+            className="filter-input"
+            type="search"
+            placeholder="Search LEGO, basketball, Saanich…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Search camps"
+          />
+        </div>
+        <p className="section-copy camp-results-count">
+          {filtered.length} {filtered.length === 1 ? "camp" : "camps"}
+          {filtersActive ? (
+            <>
+              {" "}
+              ·{" "}
+              <button
+                type="button"
+                className="inline-link camp-clear"
+                onClick={() => {
+                  setArea("");
+                  setAge("");
+                  setOpenOnly(false);
+                  setSearch("");
+                  setActiveSeason(season || "");
+                }}
+              >
+                Clear filters
+              </button>
+            </>
+          ) : null}
+        </p>
+      </section>
 
-        {groupedEvents.length > 0 ? (
-          <section className="municipality-section">
-            <div className="section-header-row">
-              <div>
-                <div className="chip-group-label">Current Camp Sessions</div>
-                <h2 className="section-title">Upcoming camps</h2>
-                <p className="section-copy">Live camp rows found by the scheduled scraper pipeline.</p>
+      {groups.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-state-mark">No camps match</span>
+          {camps.length ? "Try another age or area." : "No dates are posted yet. The providers below list them first."}
+        </div>
+      ) : (
+        groups.map(({ info, days, count }) => (
+          <section key={info.slug} className="camp-season" id={info.slug}>
+            {season ? null : (
+              <div className="camp-season-header">
+                <h2 className="section-title">{info.searchName}</h2>
+                <span className="camp-season-count">
+                  {count} {count === 1 ? "camp" : "camps"} ·{" "}
+                  <Link href={`/camps/${info.slug}`} className="inline-link">
+                    {info.searchName} page
+                  </Link>
+                </span>
               </div>
-            </div>
-            {groupedEvents.map(([dateKey, dayEvents]) => (
-              <div key={dateKey} className="day-group">
-                <div className="day-group-header">
-                  <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
-                  <span className="day-count">{dayEvents.length} camps</span>
-                </div>
-                <div className="events-list">
-                  {dayEvents.map((event) => (
-                    <EventCard key={event.id} event={event} />
+            )}
+            {days.map(([day, list]) => (
+              <div key={day} className="camp-day">
+                <h3 className="camp-day-heading">
+                  {list.some((camp) => camp.end_date) ? "Starting " : ""}
+                  {formatFullDate(`${day}T00:00:00`)}
+                  <span>{list.length}</span>
+                </h3>
+                <div className="camp-grid">
+                  {list.map((camp) => (
+                    <CampCard key={camp.id} camp={camp} />
                   ))}
                 </div>
               </div>
             ))}
           </section>
-        ) : (
-          <div className="empty-state">
-            <span className="empty-state-mark">No Scheduled Camps In Cache</span>
-            Camp sources are tracked below; many summer providers publish registration months before school break.
-          </div>
-        )}
+        ))
+      )}
 
-        <section className="filter-container">
-          <div className="section-header-row">
-            <div>
-              <div className="chip-group-label">Provider Directory</div>
-              <h2 className="section-title">Camp sources to scrape</h2>
-              <p className="section-copy">Use this as the working map for current coverage and future provider-specific scrapers.</p>
-            </div>
-          </div>
-          <div className="filter-grid">
-            <select
-              className="filter-select"
-              value={activeMunicipality}
-              onChange={(event) => setActiveMunicipality(event.target.value)}
-            >
-              <option value="">All Areas</option>
-              {sourceMunicipalities.map((municipality) => (
-                <option key={municipality} value={municipality}>
-                  {municipality}
-                </option>
-              ))}
-            </select>
-            <select
-              className="filter-select"
-              value={activeStatus}
-              onChange={(event) => setActiveStatus(event.target.value)}
-            >
-              <option value="">All Scrape States</option>
-              <option value="active">Active</option>
-              <option value="partial">Partial</option>
-              <option value="planned">Planned</option>
-            </select>
-            <input
-              className="filter-input"
-              placeholder="Search arts, STEM, soccer, outdoor, Saanich..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-        </section>
-
-        <div className="source-grid">
-          {filteredSources.map((source) => (
-            <article key={source.source_key} className="source-card">
-              <div className="section-header-row">
-                <div>
-                  <div className="venue-card-municipality">{source.municipality}</div>
-                  <h3 className="source-title">{source.name}</h3>
-                  <p className="section-copy">{source.venue_names.join("; ")}</p>
-                </div>
-                <span className={`source-status source-status-${source.automation_status}`}>
-                  {source.automation_status}
-                </span>
+      <section className="camp-providers" id="providers">
+        <h2 className="section-title">Camp providers in Greater Victoria</h2>
+        <p className="section-copy">
+          Recreation centres, community associations and independent camps. Providers with dates listed above are checked
+          every day; the rest link to their own camp pages.
+        </p>
+        <div className="camp-provider-grid">
+          {providers.map((provider) => (
+            <article key={provider.key} className="camp-provider">
+              <div className="camp-provider-area">{provider.area}</div>
+              <h3 className="camp-provider-name">{provider.name}</h3>
+              <p className="camp-provider-places">{provider.places.join(" · ")}</p>
+              <div className="camp-provider-tags">
+                {provider.tags
+                  .filter((tag) => !["municipal", "multi-activity"].includes(tag))
+                  .slice(0, 4)
+                  .map((tag) => (
+                    <span key={tag}>{tag.replace(/-/g, " ")}</span>
+                  ))}
               </div>
-              <div className="camp-source-tags">
-                {source.tags.map((tag) => (
-                  <span key={tag}>{tag}</span>
-                ))}
-              </div>
-              <div className="camp-source-actions">
-                <a href={source.primary_url} target="_blank" rel="noopener noreferrer" className="section-link">
-                  Provider
+              <div className="camp-provider-actions">
+                {provider.campCount ? (
+                  <span className="camp-provider-count">{provider.campCount} camps listed here</span>
+                ) : (
+                  <span className="camp-provider-count camp-provider-count-muted">Dates on provider site</span>
+                )}
+                <a href={provider.infoUrl} target="_blank" rel="noopener noreferrer" className="inline-link">
+                  Camp info
                 </a>
-                <a href={source.registration_url} target="_blank" rel="noopener noreferrer" className="section-link">
-                  Registration
-                </a>
-                <span>{source.scrape_strategy}</span>
               </div>
             </article>
           ))}
         </div>
-      </div>
-    </main>
+      </section>
+    </>
   );
-}
-
-function buildCampSourceSummary(sources: CampSource[]): CampSourcePayload["summary"] {
-  return {
-    total: sources.length,
-    active: sources.filter((source) => source.automation_status === "active").length,
-    partial: sources.filter((source) => source.automation_status === "partial").length,
-    planned: sources.filter((source) => source.automation_status === "planned").length,
-  };
 }

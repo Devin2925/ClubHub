@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import {
   EventData,
+  formatAges,
+  formatDateRange,
   formatTime,
   getDateKey,
   toScheduleIso,
@@ -17,9 +19,19 @@ interface EventCardProps {
   event: EventData;
   includeStructuredData?: boolean;
   happeningNow?: boolean;
+  // On a venue's own page the venue and town are the same on every card.
+  hideVenue?: boolean;
+  // One or two lines on what the class is ("LAB" says nothing on its own).
+  note?: string;
 }
 
-export default function EventCard({ event, includeStructuredData = false, happeningNow = false }: EventCardProps) {
+export default function EventCard({
+  event,
+  includeStructuredData = false,
+  happeningNow = false,
+  hideVenue = false,
+  note,
+}: EventCardProps) {
   const sport = getSportMeta(event.sport_type);
   const offering = getOfferingMeta(event.offering_type);
   const Icon = SPORT_ICON_COMPONENTS[event.sport_type] || GenericSportIcon;
@@ -84,16 +96,32 @@ export default function EventCard({ event, includeStructuredData = false, happen
             {happeningNow ? <span className="event-live-badge">Now</span> : null}
             {event.title}
           </div>
+          {event.end_date || event.ages || event.availability ? (
+            <div className="event-camp-line">
+              {event.end_date ? <span>{formatDateRange(event.start_time, event.end_date)}</span> : null}
+              {event.ages ? <span>{formatAges(event.ages)}</span> : null}
+              {event.availability ? (
+                <span className={/full/i.test(event.availability) ? "camp-spots camp-spots-full" : "camp-spots"}>
+                  {event.availability}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {note ? <p className="event-note">{note}</p> : null}
           <div className="event-meta">
-            <span>
-              <Link
-                href={`/venues/${venueSlug(event.venue_name)}?date=${getDateKey(event.start_time)}`}
-                className="event-inline-link"
-              >
-                {event.venue_name}
-              </Link>
-            </span>
-            <span>{event.municipality}</span>
+            {hideVenue ? null : (
+              <>
+                <span>
+                  <Link
+                    href={`/venues/${venueSlug(event.venue_name)}?date=${getDateKey(event.start_time)}`}
+                    className="event-inline-link"
+                  >
+                    {event.venue_name}
+                  </Link>
+                </span>
+                <span>{event.municipality}</span>
+              </>
+            )}
             <span>{offering.label}</span>
             {event.facility_name ? <span>{event.facility_name}</span> : null}
             {event.price ? (

@@ -1446,3 +1446,344 @@ a.venue-address {
   margin-right: 1rem;
   font-weight: 600;
 }
+
+/* ─── Schedule card extras ───────────────────────────────────── */
+.event-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-camp-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+/* ─── Camps ──────────────────────────────────────────────────── */
+.camp-hero h1 {
+  max-width: 18ch;
+}
+
+.camp-hero-stats {
+  margin-top: 1rem;
+  color: var(--text-secondary);
+}
+
+.camp-hero-stats strong {
+  color: var(--text-primary);
+}
+
+.camp-season-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.camp-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.camp-season-card:hover {
+  border-color: var(--sport-kids);
+  background: var(--bg-card-hover);
+}
+
+.camp-season-card-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.camp-season-card-detail {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.camp-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.chip-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.camp-filter-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.camp-results-count {
+  margin: 0;
+}
+
+.camp-clear {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.camp-season {
+  margin-top: 2.5rem;
+}
+
+.camp-season-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--text-primary);
+}
+
+.camp-day {
+  margin-top: 1.5rem;
+}
+
+.camp-day-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.camp-day-heading span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.camp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.75rem;
+}
+
+.camp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.camp-card-full {
+  opacity: 0.78;
+}
+
+.camp-card-when {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.camp-card-dates {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sport-kids);
+}
+
+.camp-spots {
+  flex-shrink: 0;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.camp-spots-full {
+  border-color: var(--border-color-hover);
+  color: var(--text-muted);
+}
+
+.camp-card-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.camp-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.camp-card-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.camp-card-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+.camp-card-where {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.camp-card-footer .event-book-link {
+  flex-shrink: 0;
+  padding: 0.45rem 1rem;
+}
+
+.camp-providers {
+  margin-top: 3.5rem;
+}
+
+.camp-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.camp-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.camp-provider-area {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.camp-provider-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.camp-provider-places {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.camp-provider-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.camp-provider-tags span {
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.camp-provider-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.camp-provider-count {
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.camp-provider-count-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.venue-camps {
+  margin-top: 2.5rem;
+}
+
+@media (max-width: 768px) {
+  .camp-season-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .camp-filter-fields {
+    grid-template-columns: 1fr;
+  }
+  .camp-grid,
+  .camp-provider-grid {
+    grid-template-columns: 1fr;
+  }
+  .camp-card {
+    padding: 0.95rem;
+  }
+  .event-note {
+    font-size: 0.78rem;
+  }
+  .event-camp-line {
+    font-size: 0.78rem;
+  }
+}
+
+.camp-season-count {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}

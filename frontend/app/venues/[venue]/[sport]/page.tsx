@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import VenueScheduleClient from "../../../components/VenueScheduleClient";
 import { DEMO_MODE } from "../../../lib/demo";
-import { getDemoEvents } from "../../../lib/snapshot.server";
+import { getDemoEvents, sessionNotes } from "../../../lib/snapshot.server";
 import { readDateParam, readParam } from "../../../lib/schedule";
 import { API_BASE, EventData, getSportMeta, nowScheduleKey, SPORT_META, venueSlug } from "../../../lib/utils";
 import {
@@ -89,9 +89,10 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
     const data = await response.json();
     allEvents = data.events || [];
   }
-  const events = allEvents
-    .filter((event) => venueSlug(event.venue_name) === venue && event.sport_type === sport)
-    .map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
+  const venueEvents = allEvents
+    .filter((event) => venueSlug(event.venue_name) === venue && event.sport_type === sport);
+  const notes = sessionNotes(venueEvents);
+  const events = venueEvents.map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
   if (events.length === 0 && !getVenueSportSeo(venue, sport)) notFound();
 
   const page = pageCopy(venue, sport);
@@ -128,6 +129,7 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
             { href: `/sports/${sport}`, label: `${page.label} across Greater Victoria` },
           ]}
           hideSportFilter
+          notes={notes}
           initialQuery={initialQuery}
           initialNow={nowScheduleKey()}
         />

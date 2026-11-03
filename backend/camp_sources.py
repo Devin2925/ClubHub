@@ -1,14 +1,18 @@
+# Camp providers across Greater Victoria. `event_sources` names the scraper sources
+# (or a source prefix, like "recdesk_") whose camp rows belong to the provider; the
+# rest are listed with links until a scraper covers them.
 CAMP_SOURCES = [
     {
         "source_key": "city_victoria_camps",
-        "name": "City of Victoria Recreation",
+        "name": "Victoria Community Centres",
         "municipality": "Victoria",
-        "venue_names": ["Crystal Pool and Fitness Centre", "Victoria community centres"],
+        "venue_names": ["Oaklands Community Centre", "Fairfield Community Place", "Victoria West Community Centre"],
         "primary_url": "https://www.victoria.ca/parks-recreation/recreation",
         "registration_url": "https://cityofvictoria.perfectmind.com/23902/Clients/BookMe4?widgetId=15f6af07-39c5-473e-b053-96653f77a406",
         "scrape_strategy": "perfectmind",
         "automation_status": "active",
         "sync_source_key": "perfectmind_victoria",
+        "event_sources": ["recdesk_"],
         "tags": ["municipal", "multi-activity", "arts", "sports"],
     },
     {
@@ -24,8 +28,9 @@ CAMP_SOURCES = [
         "primary_url": "https://www.saanich.ca/EN/main/parks-recreation-community/recreation/saanich-day-camps.html",
         "registration_url": "https://anc.ca.apm.activecommunities.com/saanich/activity/search?onlineSiteId=0&activity_select_param=2&viewMode=list",
         "scrape_strategy": "activenet_activity_search",
-        "automation_status": "partial",
+        "automation_status": "active",
         "sync_source_key": "saanich_active_communities",
+        "event_sources": ["saanich_camps"],
         "tags": ["municipal", "multi-activity", "arts", "sports", "stem"],
     },
     {
@@ -38,6 +43,7 @@ CAMP_SOURCES = [
         "scrape_strategy": "perfectmind",
         "automation_status": "active",
         "sync_source_key": "perfectmind_oak_bay",
+        "event_sources": ["pm_camps_oakbayrec"],
         "tags": ["municipal", "multi-activity", "sports", "arts"],
     },
     {
@@ -50,6 +56,7 @@ CAMP_SOURCES = [
         "scrape_strategy": "perfectmind",
         "automation_status": "active",
         "sync_source_key": "perfectmind_esquimalt",
+        "event_sources": ["pm_camps_esquimalt"],
         "tags": ["municipal", "multi-activity", "childcare"],
     },
     {
@@ -62,6 +69,7 @@ CAMP_SOURCES = [
         "scrape_strategy": "intelligenz_programs",
         "automation_status": "active",
         "sync_source_key": "west_shore_camps",
+        "event_sources": ["wspr_camps"],
         "tags": ["municipal", "multi-activity", "sports", "arts", "licensed"],
     },
     {
@@ -74,6 +82,7 @@ CAMP_SOURCES = [
         "scrape_strategy": "perfectmind",
         "automation_status": "active",
         "sync_source_key": "perfectmind_panorama",
+        "event_sources": ["pm_camps_panoramarec"],
         "tags": ["municipal", "multi-activity", "sports", "arts", "stem"],
     },
     {
@@ -86,6 +95,7 @@ CAMP_SOURCES = [
         "scrape_strategy": "perfectmind",
         "automation_status": "active",
         "sync_source_key": "perfectmind_sooke",
+        "event_sources": ["pm_camps_seaparcrecreation"],
         "tags": ["municipal", "multi-activity", "spring-break", "summer"],
     },
     {
@@ -140,12 +150,13 @@ CAMP_SOURCES = [
         "source_key": "braefoot_camps",
         "name": "Braefoot Community Association",
         "municipality": "Saanich",
-        "venue_names": ["Braefoot Park", "Braefoot Community Association"],
+        "venue_names": ["Braefoot Park", "Braefoot and Marigold Elementary"],
         "primary_url": "https://www.braefoot.ca/summer-camps",
         "registration_url": "https://www.braefoot.ca/summer-camps",
         "scrape_strategy": "provider_page",
-        "automation_status": "planned",
+        "automation_status": "active",
         "sync_source_key": "",
+        "event_sources": ["braefoot_camps"],
         "tags": ["multi-activity", "sports", "pro-d", "school-break"],
     },
     {

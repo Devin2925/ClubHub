@@ -112,6 +112,33 @@ export function formatMonthDay(isoString: string): string {
   });
 }
 
+// "Mon, Dec 21 – Thu, Dec 24" for a multi-day camp, "Fri, Nov 27" for one day.
+export function formatDateRange(start: string, endDate?: string): string {
+  const first = formatDate(start);
+  if (!endDate || endDate <= getDateKey(start)) return first;
+  return `${first} – ${formatDate(`${endDate}T00:00:00`)}`;
+}
+
+// Weekdays a camp runs, counting the first and last day: 4 for Mon-Thu.
+export function campDayCount(start: string, endDate?: string): number {
+  if (!endDate) return 1;
+  const from = Date.parse(`${getDateKey(start)}T00:00:00Z`);
+  const to = Date.parse(`${endDate}T00:00:00Z`);
+  let days = 0;
+  for (let time = from; time <= to; time += 86400000) {
+    const weekday = new Date(time).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days += 1;
+  }
+  return Math.max(days, 1);
+}
+
+// "Ages 5-11", "Grades 1-5", "Kindergarten"
+export function formatAges(ages?: string): string {
+  if (!ages) return "";
+  const text = ages.replace(/-/g, "–");
+  return /^\d/.test(text) || /^Up to/.test(text) ? `Ages ${text}` : text;
+}
+
 // Sync timestamps are UTC instants; the backend writes them without an offset.
 export function formatDateTime(isoString: string): string {
   const date = new Date(OFFSET_RE.test(isoString.trim()) ? isoString : `${isoString.replace(" ", "T")}Z`);
@@ -210,4 +237,9 @@ export interface EventData {
   source: string;
   municipality: string;
   last_fetched: string;
+  // Camps: the last day of a multi-day run (start/end_time hold the first day's
+  // hours), spots left as the provider words it, and the age range ("5-11").
+  end_date?: string;
+  availability?: string;
+  ages?: string;
 }

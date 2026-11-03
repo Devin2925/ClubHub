@@ -68,6 +68,8 @@ export type DemoCampSourceRow = {
   automation_status: "active" | "partial" | "planned";
   scrape_strategy: string;
   sync_source_key: string;
+  // Scraper sources (or prefixes) whose camp rows belong to this provider.
+  event_sources?: string[];
   tags: string[];
 };
 

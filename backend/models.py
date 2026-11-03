@@ -36,6 +36,12 @@ class Event(Base):
     registration_required = Column(Boolean)
     age_group = Column(String, nullable=False, default="")
     skill_level = Column(String, nullable=False, default="")
+    # Camps and courses: the last day of a multi-day run (YYYY-MM-DD; start_time/end_time
+    # hold the first day's hours), spots left as the provider words it, and an age range
+    # for people ("5-11").
+    end_date = Column(String, nullable=False, default="")
+    availability = Column(String, nullable=False, default="")
+    ages = Column(String, nullable=False, default="")
     last_fetched = Column(DateTime, default=utcnow)
     created_at = Column(DateTime, default=utcnow)
 
@@ -59,6 +65,9 @@ class Event(Base):
             "registration_required": self.registration_required,
             "age_group": self.age_group,
             "skill_level": self.skill_level,
+            "end_date": self.end_date,
+            "availability": self.availability,
+            "ages": self.ages,
             "last_fetched": self.last_fetched.isoformat() if self.last_fetched else None,
         }
 
@@ -159,6 +168,9 @@ def ensure_columns():
                     "ADD COLUMN age_group VARCHAR NOT NULL DEFAULT ''"
                 )
             )
+        for column in ("end_date", "availability", "ages"):
+            if column not in event_columns:
+                conn.execute(text(f"ALTER TABLE events ADD COLUMN {column} VARCHAR NOT NULL DEFAULT ''"))
         if "skill_level" not in event_columns:
             conn.execute(
                 text(

@@ -62,6 +62,14 @@ export const metadata: Metadata = {
 
 const feedbackEmail = "clubhubvictoria@gmail.com";
 // Worded the way people search for these venues (Search Console top queries).
+const campPages = [
+  { href: "/camps", label: "Kids camps in Victoria" },
+  { href: "/camps/winter-break", label: "Winter break camps" },
+  { href: "/camps/pro-d-days", label: "Pro-D day camps" },
+  { href: "/camps/spring-break", label: "Spring break camps" },
+  { href: "/camps/summer", label: "Summer camps" },
+];
+
 const popularSchedules = [
   { href: "/venues/henderson-recreation-centre", label: "Henderson Rec Centre schedule" },
   { href: "/venues/saanich-commonwealth-place", label: "Commonwealth Pool schedule" },
@@ -210,6 +218,7 @@ export default function RootLayout({
               { label: "Popular schedules", links: popularSchedules },
               { label: "Drop-ins by activity", links: popularActivities },
               { label: "Drop-ins by area", links: areaSchedules },
+              { label: "Kids camps", links: campPages },
             ].map((group) => (
               <nav key={group.label} className="footer-popular" aria-label={group.label}>
                 <span className="footer-popular-label">{group.label}</span>

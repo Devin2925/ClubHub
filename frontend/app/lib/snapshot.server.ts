@@ -126,3 +126,26 @@ export function initialSchedule(filter: EventFilter, date: string | null | undef
   );
   return { upcoming, dates, events };
 }
+
+// Scraper placeholders ("Oak Bay racquet sports PDF schedule.") say nothing about the class.
+const GENERIC_NOTE = /\b(pdf|public) schedule\.?$|^public uvic|schedule\.?$/i;
+
+function shortNote(text: string, limit = 170): string {
+  const clean = text.replace(/\s+/g, " ").replace(/\*+/g, "").trim();
+  if (clean.length <= limit) return clean;
+  const sentence = clean.slice(0, limit).lastIndexOf(". ");
+  if (sentence > 70) return clean.slice(0, sentence + 1);
+  return `${clean.slice(0, limit).replace(/\s+\S*$/, "")}…`;
+}
+
+// One short "what is this" line per session title, for a venue's schedule cards.
+export function sessionNotes(events: EventData[]): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const event of events) {
+    if (notes[event.title] || event.offering_type === "camp") continue;
+    const text = (event.description || "").trim();
+    if (text.length < 15 || GENERIC_NOTE.test(text) || text.toLowerCase() === event.title.toLowerCase()) continue;
+    notes[event.title] = shortNote(text);
+  }
+  return notes;
+}

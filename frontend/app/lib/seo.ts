@@ -47,10 +47,11 @@ interface VenueSeo {
 const VENUE_SEO: Record<string, VenueSeo> = {
   "henderson-recreation-centre": {
     searchName: "Henderson Rec Centre",
+    alternateNames: ["Henderson Recreation Center", "Henderson Rec Center", "Henderson Centre Oak Bay"],
     address: "2291 Cedar Hill X Road, Victoria, BC V8P 5H9",
     metaTitle: "Henderson Rec Centre Schedule & Drop-Ins",
     metaDescription:
-      "See today's and upcoming pickleball, badminton, table tennis and fitness times at Henderson Rec Centre in Oak Bay.",
+      "Today's Henderson Rec Centre schedule: pickleball, badminton and table tennis drop-ins, cycle and fitness classes, fitness centre hours and kids camps in Oak Bay.",
     heading: "Henderson Rec Centre schedule",
     summary:
       "Pickleball, badminton and table tennis drop-ins, court rentals, group fitness classes and fitness centre hours at Oak Bay's Henderson Recreation Centre.",
@@ -59,6 +60,16 @@ const VENUE_SEO: Record<string, VenueSeo> = {
         question: "What drop-ins are at Henderson Rec Centre?",
         answer:
           "Current listings include pickleball, badminton and table tennis social play, indoor court rentals, group fitness and fitness centre drop-in times.",
+      },
+      {
+        question: "What does \"Reserved Drop-in\" mean at Henderson?",
+        answer:
+          "Oak Bay runs its racquet social play as reserved drop-ins: you book a spot ahead through Oak Bay Recreation's online registration rather than just showing up. Tap Book on a session to go to it.",
+      },
+      {
+        question: "Where is Henderson Rec Centre?",
+        answer:
+          "Henderson Recreation Centre is at 2291 Cedar Hill Cross Road in Oak Bay, in Henderson Park. It is run by Oak Bay Parks, Recreation and Culture.",
       },
       {
         question: "Does this schedule include today's activities?",
@@ -92,7 +103,8 @@ const VENUE_SEO: Record<string, VenueSeo> = {
   },
   "carsa-vikes-recreation": {
     searchName: "CARSA",
-    alternateNames: ["UVic CARSA", "Vikes Recreation", "Vikes Rec"],
+    alternateNames: ["UVic CARSA", "Vikes Recreation", "Vikes Rec", "Centre for Athletics, Recreation and Special Abilities"],
+    address: "3964 Gordon Head Road, Victoria, BC",
     metaTitle: "CARSA Drop-In Schedule: Yoga, Basketball & More",
     metaDescription:
       "Today's UVic CARSA schedule: drop-in yoga, basketball, volleyball, badminton, pickleball, squash and group fitness times for UVic students.",
@@ -115,6 +127,11 @@ const VENUE_SEO: Record<string, VenueSeo> = {
         question: "Is this the UVic Vikes Recreation schedule?",
         answer:
           "Yes. CARSA is UVic's Vikes Recreation centre; this page lists its public drop-in, yoga and group fitness schedule by date and activity.",
+      },
+      {
+        question: "Do I need to book CARSA classes?",
+        answer:
+          "Yoga and group fitness classes have a reserve-a-spot link to UVic's ActiveLiving booking, which Book opens. Pickleball court passes are booked too; drop-in basketball, volleyball, badminton and open play don't need a booking.",
       },
     ],
   },
@@ -239,7 +256,8 @@ export function getVenueSportSeo(venue: string, sport: string) {
 export function venueSportCounts(slug: string): [string, number][] {
   const counts = new Map<string, number>();
   for (const event of upcomingEvents()) {
-    if (event.sport_type === "other" || venueSlug(event.venue_name) !== slug) continue;
+    // Camps have their own pages under /camps.
+    if (event.sport_type === "other" || event.offering_type === "camp" || venueSlug(event.venue_name) !== slug) continue;
     counts.set(event.sport_type, (counts.get(event.sport_type) || 0) + 1);
   }
   return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -248,7 +266,7 @@ export function venueSportCounts(slug: string): [string, number][] {
 export function venueSportPages(): { venue: string; sport: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const event of upcomingEvents()) {
-    if (event.sport_type === "other") continue;
+    if (event.sport_type === "other" || event.offering_type === "camp") continue;
     const key = `${venueSlug(event.venue_name)}/${event.sport_type}`;
     counts.set(key, (counts.get(key) || 0) + 1);
   }

@@ -5,7 +5,7 @@ import shutil
 import threading
 from datetime import datetime
 from time import perf_counter
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from models import Event, SessionLocal, SourceSyncStatus, VenueSyncStatus, init_db, utcnow
 from scrapers.burnside_gorge import BurnsideGorgeScraper
@@ -28,6 +28,9 @@ from scrapers.saanich import SaanichScraper
 from scrapers.vikesrec import VikesRecScraper
 from scrapers.wspr import WSPRScraper
 from scrapers.wspr_camps import WSPRCampsScraper
+from scrapers.saanich_camps import SaanichCampsScraper
+from scrapers.perfectmind_camps import CAMP_SITES, PerfectMindCampsScraper
+from scrapers.braefoot_camps import BraefootCampsScraper
 from venue_registry import VENUE_REGISTRY
 
 SCRAPER_TIMEOUT_SECONDS = 90
@@ -120,9 +123,11 @@ def _prune_expired_events():
     db = SessionLocal()
     try:
         cutoff = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Multi-day camps stay until their last day (end_date), not their first.
         deleted = (
             db.query(Event)
             .filter(Event.start_time < cutoff)
+            .filter(or_(Event.end_date == "", Event.end_date < cutoff.date().isoformat()))
             .delete(synchronize_session=False)
         )
         db.commit()
@@ -366,6 +371,15 @@ def iter_scrapers():
     yield ("uvic_vikesrec", "UVic CARSA / Vikes Recreation", "UVic", VikesRecScraper())
     yield ("west_shore_public", "West Shore Parks & Recreation", "West Shore", WSPRScraper())
     yield ("west_shore_camps", "West Shore Parks & Recreation Camps", "West Shore", WSPRCampsScraper())
+    yield ("saanich_camps", "Saanich Day Camps", "Saanich", SaanichCampsScraper())
+    for site in CAMP_SITES:
+        yield (
+            f"perfectmind_camps_{site['subdomain']}",
+            f"{site['municipality']} Camps",
+            site["municipality"],
+            PerfectMindCampsScraper(**site),
+        )
+    yield ("braefoot_camps", "Braefoot Camps", "Saanich", BraefootCampsScraper())
 
 
 def list_sync_targets():
