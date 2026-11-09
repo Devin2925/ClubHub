@@ -139,7 +139,17 @@ if git diff --cached --quiet -- "$SNAPSHOT"; then
   exit 0
 fi
 git commit -q -m "Refresh public snapshot with $(date '+%Y-%m-%d') scrape" -- "$SNAPSHOT"
-git push -q origin main 2>&1 | tee -a "$LOG"
+# ClubHub Vancouver's refresh also pushes main; if it got there first, rebase onto it and retry.
+PUSHED=false
+for attempt in 1 2 3; do
+  if git push -q origin main >> "$LOG" 2>&1; then PUSHED=true; break; fi
+  echo "Push rejected (attempt $attempt); rebasing onto origin/main and retrying." | tee -a "$LOG"
+  git pull -q --rebase --autostash origin main >> "$LOG" 2>&1 || { git rebase --abort >/dev/null 2>&1; break; }
+done
+if [[ "$PUSHED" != true ]]; then
+  echo "Couldn't push the snapshot commit - see $LOG. It's committed locally; run 'git pull --rebase && git push'." | tee -a "$LOG"
+  exit 1
+fi
 echo "Pushed $(git rev-parse --short HEAD); Vercel deploys main." | tee -a "$LOG"
 
 # --- 6. Confirm live -------------------------------------------------------------
