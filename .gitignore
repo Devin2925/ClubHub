@@ -20,6 +20,7 @@ backend/tmp/
 backend/com.clubhub.sync.plist
 
 backend/clubhub.db
+backend/clubhub_vancouver.db
 clubhub.db
 
 .vercel/

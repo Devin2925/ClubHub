@@ -245,14 +245,18 @@ class BaseScraper:
     def __init__(self, source_id_prefix: str, municipality: str):
         self.source_id_prefix = source_id_prefix # e.g. "saanich", "victoria"
         self.municipality = municipality         # e.g. "Saanich", "Victoria"
-    
+
+    def open_db(self):
+        """Session for this scraper's database (Victoria's clubhub.db unless a subclass says otherwise)."""
+        return SessionLocal()
+
     def scrape(self):
         """Must be implemented by subclasses. Returns list of event dicts."""
         raise NotImplementedError
 
     def replace_existing_events(self):
         """Replace all events owned by this scraper source before saving a fresh run."""
-        db = SessionLocal()
+        db = self.open_db()
         try:
             deleted = db.execute(
                 delete(Event).where(Event.source == self.source_id_prefix)
@@ -275,7 +279,7 @@ class BaseScraper:
         floor = datetime.combine(datetime.now().date(), datetime.min.time())
         if start and start > floor:
             floor = start
-        db = SessionLocal()
+        db = self.open_db()
         try:
             query = (
                 delete(Event)
@@ -297,7 +301,7 @@ class BaseScraper:
 
     def save_events(self, events: list):
         """Upsert events into the database."""
-        db = SessionLocal()
+        db = self.open_db()
         try:
             saved = 0
             updated = 0

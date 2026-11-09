@@ -29,6 +29,7 @@ class SaanichScraper(BaseScraper):
         super().__init__(source_id_prefix="saanich", municipality="Saanich")
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
+        self.fetch_failed = False
 
     def _init_session(self):
         try:
@@ -88,6 +89,7 @@ class SaanichScraper(BaseScraper):
             return all_events
         except Exception as exc:
             print(f"[Saanich] Calendar {calendar_id} fetch failed: {exc}")
+            self.fetch_failed = True
             return []
 
     def _normalize_event(self, raw_event: dict) -> dict:
@@ -126,8 +128,10 @@ class SaanichScraper(BaseScraper):
         if price_info.get("free"):
             price = "Free"
 
+        # event_item_id is the activity; one id carries every date it runs, so the
+        # session is the id plus its start.
         return {
-            "source_id": f"saanich_{event_item_id}",
+            "source_id": f"saanich_{event_item_id}_{start_time:%Y%m%d%H%M}",
             "title": title,
             "sport_type": classify_sport(title),
             "venue_name": venue_name,
@@ -152,13 +156,17 @@ class SaanichScraper(BaseScraper):
         for cal_id in CALENDAR_IDS_TO_TRY:
             raw_events = self._fetch_events(cal_id, center_ids)
             for ev in raw_events:
-                if not isinstance(ev, dict):
+                if not isinstance(ev, dict) or not ev.get("event_item_id"):
                     continue
-                eid = ev.get("event_item_id")
-                if eid and eid not in seen_ids:
-                    seen_ids.add(eid)
-                    all_events.append(self._normalize_event(ev))
+                event = self._normalize_event(ev)
+                if event["source_id"] not in seen_ids:
+                    seen_ids.add(event["source_id"])
+                    all_events.append(event)
             time.sleep(0.5)
 
         self.save_events(all_events)
+        # A complete run lists everything upcoming, so drop rows it no longer lists
+        # (cancelled sessions, and rows saved under the old one-row-per-activity ids).
+        if all_events and not self.fetch_failed:
+            self.prune_unseen_upcoming(seen_ids)
         return all_events
