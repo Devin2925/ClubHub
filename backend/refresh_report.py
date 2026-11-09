@@ -32,6 +32,7 @@ KNOWN_NOISE = {
     "perfectmind_victoria": "Crystal Pool closed for good (2026-09-25); only a few City of Victoria rows remain.",
     "cook_street_pdf": "Month-only PDF: counts fall through the month and jump when next month's PDF posts.",
     "jbnh_monthly_pdf": "Month-only PDF: 0 is normal between James Bay New Horizons monthly posts.",
+    "victoria_events": "City calendar is mostly civic notices (skipped) outside the CityVibe summer season; 0 is normal then.",
     # ClubHub Vancouver (clubhub_vancouver.db) sources go here too; keys don't overlap.
 }
 

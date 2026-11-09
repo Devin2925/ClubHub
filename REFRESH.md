@@ -64,7 +64,29 @@ It takes about 5–10 minutes. Everything it prints is also saved to
 
 Known noise today: Crystal Pool is closed (`perfectmind_victoria` has few rows);
 Cook Street and James Bay New Horizons post month-only PDFs, so their counts
-dip mid-month.
+dip mid-month. Off-season, the City of Victoria calendar (`victoria_events`) can
+be empty; in summer it fills with CityVibe events.
+
+### Community event calendars
+
+Events are saved as offering "event" (Community). Each scraper's docstring says
+where it reads from.
+
+| Source key | Calendar | How it's read |
+|---|---|---|
+| `oakbay_events` | oakbay.ca events | The Events Calendar (Tribe) JSON API |
+| `saanich_events` | saanich.ca events, plus ActiveNet "Social - Events" | RSS, plus each page's `calendarEvent` |
+| `esquimalt_events`, `victoria_events`, `wspr_events` | esquimalt.ca, victoria.ca, wspr.ca | Drupal FullCalendar JSON in the page (`drupal_calendar_events.py`) |
+| `langford_events` | langford.ca/events | Modern Events Calendar REST list, plus each page's JSON-LD |
+| `panorama_events`, `seaparc_events` | Panorama and SEAPARC special events | CRD month grid (`crd_special_events.py`), 6 months ahead |
+| `fernwood_calendar` | fernwoodnrg.ca | Tribe JSON API (programs plus events) |
+
+- When a calendar breaks, it's usually a redesign. Open its page and check that
+  the data is still where the docstring says.
+- Event times are B.C. local time (UTC-7 year-round since Nov 2026), stored as
+  wall-clock time.
+- WSPR hockey games stop after March. A sharp drop then is the season ending,
+  not a bug.
 
 ## Adding a new source
 

@@ -84,6 +84,11 @@ Then decide which case it is:
   change to that closure entry. Cook Street and JBNH dip mid-month (month-only PDFs). Summer
   and spring camps appear when providers publish (early 2027); no code change is needed.
 - Each term: recheck the CARSA student facts (vikesrec.ca/membership) used in `VENUE_SPORT_SEO`.
+- Community event calendars: Oak Bay, Saanich, Esquimalt, City of Victoria, WSPR, Langford,
+  Panorama, SEAPARC and Fernwood. The REFRESH.md table "Community event calendars" says how
+  each one is read. Small counts are normal: Victoria's city calendar is near-empty outside the
+  CityVibe summer season, and WSPR's hockey games end in March. A FAILED one is usually a
+  redesign, so check that the data is still where the scraper's docstring says.
 
 ### Vancouver sources (`backend/scrapers/vancouver_*.py`)
 
