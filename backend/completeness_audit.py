@@ -39,8 +39,8 @@ def source_key_for_venue(venue: dict) -> str | None:
         return "burnside_gorge_html"
     if connector == "wordpress_events_html":
         return "james_bay_events_html"
-    if connector == "eventon_wp_rest_api":
-        return "fernwood_eventon"
+    if connector == "tribe_events_api" and venue_name.startswith("Fernwood"):
+        return "fernwood_calendar"
     if connector == "weebly_pdf_calendar":
         return "jbnh_monthly_pdf"
     if connector == "static_program_pdfs":

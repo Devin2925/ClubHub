@@ -1,0 +1,83 @@
+# Refreshing ClubHub Victoria
+
+One command scrapes every source, checks the results, builds the site, publishes
+the new data and waits until it's live:
+
+```sh
+./update_public_site.sh
+```
+
+It takes about 5–10 minutes. Everything it prints is also saved to
+`backend/logs/refresh-<timestamp>.log`.
+
+## What it does
+
+1. **Preflight.** Confirms you're on `main` and lists any other uncommitted
+   changes. It leaves those changes alone and never commits them.
+2. **Scrape.** Runs `backend/run_sync.py` (every source in `iter_scrapers()`).
+   A source that fails keeps its existing rows.
+3. **Check.** Runs `backend/refresh_report.py`, which gives one line per source:
+   - `OK`: it ran and returned plausible numbers.
+   - `KNOWN`: something looks odd, but it's expected (listed in `KNOWN_NOISE`).
+   - `CHECK`: it ran but returned 0, or dropped by half. **Look before publishing.**
+   - `FAILED`: the scrape errored. Its old rows are still in place.
+   - `SKIPPED`: it didn't run in this refresh.
+   - `STALE`: upcoming rows that no source has refreshed in 10+ days. This is
+     usually a dead feed or a removed scraper; Fernwood's old EventON feed did this.
+
+   If anything is `CHECK`, `FAILED`, `SKIPPED` or `STALE`, the script **stops
+   here** without publishing.
+4. **Export + build.** Writes `frontend/data/demo-snapshot.json` and runs
+   `next build`. iCloud's "name 2.tsx" copies are moved aside for the build and
+   always put back.
+5. **Publish.** Commits only the snapshot and pushes `main`. Vercel deploys `main`
+   on its own.
+6. **Confirm.** Waits until clubhubvictoria.ca's sitemap shows the new snapshot
+   time.
+
+## Options
+
+| | |
+|---|---|
+| `--no-publish` | Stop after the local build (nothing committed or pushed) |
+| `--skip-sync` | Re-check and publish what's already in the database |
+| `--source-key KEY` | Scrape only that source (repeatable), then publish |
+| `--force` | Publish even though the report flagged something |
+
+## When it stops at the report
+
+1. Find the source in the log, e.g. `grep -n "\[Oak Bay\]" backend/logs/refresh-*.log | tail`.
+2. Open the source's own page (the URL is in the scraper's docstring and in
+   `backend/venue_registry.py`).
+3. Then do one of these:
+   - **The site changed:** fix the scraper, then rerun just that source with
+     `--source-key`.
+   - **The number is expected** (a closure, an off-season month): add it to
+     `KNOWN_NOISE` in `backend/refresh_report.py` with a one-line reason.
+   - **The source is gone for good:** remove it from `run_sync.py` and delete its
+     upcoming rows (`delete from events where source='<prefix>'`, after copying
+     `backend/clubhub.db` to `backend/backups/`). Otherwise its rows show as STALE.
+   - **Publish anyway:** `./update_public_site.sh --skip-sync --force`.
+
+Known noise today: Crystal Pool is closed (`perfectmind_victoria` has few rows);
+Cook Street and James Bay New Horizons post month-only PDFs, so their counts
+dip mid-month.
+
+## Adding a new source
+
+1. Write `backend/scrapers/<name>.py` (a `BaseScraper` subclass). Put the source
+   URL and anything odd about it in the docstring. Shared helpers:
+   - `event_utils.event_row` for community events.
+   - `camp_utils.camp_row` for camps.
+   - `prune_unseen_upcoming()` after a complete run.
+2. Add a `yield` for it in `iter_scrapers()` in `backend/run_sync.py`.
+3. Add or update the venue in `backend/venue_registry.py`.
+4. Try it: `./update_public_site.sh --source-key <key> --no-publish`.
+
+## Where things live
+
+| | |
+|---|---|
+| Live database | `backend/clubhub.db` (gitignored; the sync backs it up to `backend/backups/` each run) |
+| Published data | `frontend/data/demo-snapshot.json` |
+| Vancouver (separate) | `backend/vancouver_sync.py` → `backend/clubhub_vancouver.db`; not part of this refresh |

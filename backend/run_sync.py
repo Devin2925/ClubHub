@@ -11,7 +11,7 @@ from models import Event, SessionLocal, SourceSyncStatus, VenueSyncStatus, init_
 from scrapers.burnside_gorge import BurnsideGorgeScraper
 from scrapers.calendar_online import CalendarOnlineScraper
 from scrapers.cookstreet_pdf import CookStreetPDFScraper
-from scrapers.fernwood import FernwoodScraper
+from scrapers.fernwood_calendar import FernwoodCalendarScraper
 from scrapers.jamesbay_events import JamesBayEventsScraper
 from scrapers.jbnh_pdf import JBNHPDFScraper
 from scrapers.oakbay_fitness import OakBayFitnessScraper
@@ -348,7 +348,7 @@ def iter_scrapers():
     yield ("james_bay_events_html", "James Bay Community School Centre", "Victoria", JamesBayEventsScraper())
     yield ("jbnh_monthly_pdf", "James Bay New Horizons", "Victoria", JBNHPDFScraper())
     yield ("burnside_gorge_html", "Burnside Gorge Community Centre", "Victoria", BurnsideGorgeScraper())
-    yield ("fernwood_eventon", "Fernwood Community Centre", "Victoria", FernwoodScraper())
+    yield ("fernwood_calendar", "Fernwood NRG Events Calendar", "Victoria", FernwoodCalendarScraper())
     yield ("cook_street_pdf", "Cook Street Village Activity Centre", "Victoria", CookStreetPDFScraper())
     yield (
         "silver_threads_recdesk",
