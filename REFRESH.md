@@ -117,10 +117,13 @@ where it reads from.
 ./update_vancouver.sh --dry-run           # fetch + filter only; lists what the filters dropped
 ```
 
-It scrapes the 12 Metro Vancouver sources into `backend/clubhub_vancouver.db`. They
-are four ActiveNet cities (`scrapers/vancouver_activenet.py`) and eight PerfectMind
-cities (`scrapers/vancouver_perfectmind.py`). Then it runs the same
-`refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
+It scrapes the 13 Metro Vancouver sources into `backend/clubhub_vancouver.db`:
+- four ActiveNet cities (`scrapers/vancouver_activenet.py`)
+- eight PerfectMind cities (`scrapers/vancouver_perfectmind.py`)
+- UBC Recreation (`scrapers/vancouver_ubc.py`), read from the JSON feed behind
+  recreation.ubc.ca's schedule pages
+
+Then it runs the same `refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
 `backend/vancouver_registry.py`. If everything is OK it exports
 `frontend/data/vancouver-snapshot.json` (`export_demo_snapshot.py --city vancouver`),
 commits only that file, pushes main, and waits for the `clubhub-vancouver` Vercel

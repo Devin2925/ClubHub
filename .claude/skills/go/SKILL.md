@@ -39,7 +39,7 @@ They use different databases, so run both in the background and wait for both:
 
 ```sh
 ./update_public_site.sh      # Victoria: scrape, report, export, build, publish, confirm live (5-10 min)
-./update_vancouver.sh        # Vancouver: scrape 12 sources, report, registry check, export, publish, confirm (~5 min)
+./update_vancouver.sh        # Vancouver: scrape 13 sources, report, registry check, export, publish, confirm (~5 min)
 ```
 
 Only Victoria's script runs `next build` locally (Vancouver relies on Vercel's build), so they
@@ -97,6 +97,9 @@ Then decide which case it is:
 - **FAILED PerfectMind** (`*_perfectmind`) with "widget page refused": the city changed
   its widget or account id. Find the new BookMe4 link on the city's drop-in page and update
   `PERFECTMIND_SOURCES` in `vancouver_perfectmind.py`.
+- **FAILED `ubc_recreation`:** a UBC schedule page changed its calendar. Copy the new
+  `calname`/`location` from that page's `WPFC.data` block into `UBC_CALENDARS` in
+  `vancouver_ubc.py`. UBC terms end in early December and April, so counts dip between terms.
 - **CHECK on a count:** PerfectMind cities publish only 2-4 weeks ahead (Coquitlam ~2,
   Delta ~4), and holiday weeks dip, so look at the source before calling it broken.
 - **Registry check** (printed by `vancouver_sync.py`):
