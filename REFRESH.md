@@ -88,8 +88,10 @@ dip mid-month.
 ## ClubHub Vancouver
 
 ```sh
-./update_vancouver.sh                     # every source (~5 min)
-./update_vancouver.sh burnaby_activenet   # one source (keys: backend/vancouver_sync.py --list)
+./update_vancouver.sh                     # every source, then publish (~5 min)
+./update_vancouver.sh burnaby_activenet   # one source (keys: backend/vancouver_sync.py --list), then publish
+./update_vancouver.sh --no-publish        # scrape + check only
+./update_vancouver.sh --skip-sync         # re-check and publish what's in the database
 ./update_vancouver.sh --dry-run           # fetch + filter only; lists what the filters dropped
 ```
 
@@ -97,8 +99,20 @@ It scrapes the 12 Metro Vancouver sources into `backend/clubhub_vancouver.db`. T
 are four ActiveNet cities (`scrapers/vancouver_activenet.py`) and eight PerfectMind
 cities (`scrapers/vancouver_perfectmind.py`). Then it runs the same
 `refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
-`backend/vancouver_registry.py`. Nothing is exported or published yet, and nothing
-touches Victoria.
+`backend/vancouver_registry.py`. If everything is OK it exports
+`frontend/data/vancouver-snapshot.json` (`export_demo_snapshot.py --city vancouver`),
+commits only that file, pushes main, and waits for the `clubhub-vancouver` Vercel
+project's deploy status. Nothing touches Victoria.
+
+**The site** is the same Next app as Victoria, built with `NEXT_PUBLIC_CITY=vancouver`:
+
+- `frontend/app/lib/city.ts` holds each city's name, domain and region.
+- Per-city copy sits next to Victoria's in `lib/seo.ts`, `lib/searchPages.ts`,
+  `lib/closures.ts` and `layout.tsx`.
+- `next.config.ts` points `@clubhub/snapshot` at the city's snapshot.
+- `/camps` is Victoria-only.
+- To preview it locally:
+  `cd frontend && NEXT_PUBLIC_CITY=vancouver NEXT_PUBLIC_DEMO_MODE=true npx next dev`.
 
 - **Drop-in filters:** `scrapers/vancouver_common.py` drops private lessons,
   rentals (including per-court bookings) and closures. Each run's log lists what

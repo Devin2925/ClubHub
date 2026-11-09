@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
 import { DEMO_MODE, fetchDemoEvents } from "./lib/demo";
+import { CITY, forCity } from "./lib/city";
 import {
   API_BASE,
   DISPLAY_TIME_ZONE,
@@ -58,7 +59,23 @@ export interface HomeClientProps {
 const INITIAL_EVENT_LIMIT = 80;
 const EVENT_LIMIT_STEP = 80;
 const REMEMBERED_PLACE_KEY = "clubhub:place";
-const contactPhone = { display: "203-979-3744", tel: "+12039793744" };
+const HERO_COPY = forCity({
+  victoria: {
+    where: "Victoria",
+    subtitle: "Swims, skates, pickleball, hockey, fitness, and community programs at every Greater Victoria rec centre.",
+    allVenues: "All rec centres in Greater Victoria",
+    coverage:
+      "Victoria-area municipal rec centres, community schedules, and UVic CARSA where times are publicly posted, so locals can check one site instead of bouncing between rec pages.",
+  },
+  vancouver: {
+    where: "Metro Vancouver",
+    subtitle:
+      "Swims, skates, pickleball, hockey, fitness, and community programs at rec centres and community centres across Metro Vancouver.",
+    allVenues: "All rec centres in Metro Vancouver",
+    coverage:
+      "City rec centres, pools, rinks and community centres in Vancouver, Burnaby, Richmond, the Tri-Cities, the North Shore and beyond, where times are publicly posted, so locals can check one site instead of bouncing between rec pages.",
+  },
+});
 
 export default function HomeClient({
   initialEvents,
@@ -293,10 +310,10 @@ export default function HomeClient({
       <div className="container">
         <section className="hero hero-simple hero-compact">
           <h1>
-            Find <strong>drop-ins, classes, and rec schedules</strong> across Victoria
+            Find <strong>drop-ins, classes, and rec schedules</strong> across {HERO_COPY.where}
           </h1>
           <p className="hero-subtitle">
-            Swims, skates, pickleball, hockey, fitness, and community programs at every Greater Victoria rec centre.
+            {HERO_COPY.subtitle}
           </p>
 
           <div className="hero-actions">
@@ -357,7 +374,7 @@ export default function HomeClient({
                 onChange={(event) => selectVenue(event.target.value)}
                 disabled={municipalities.length === 0}
               >
-                <option value="">{activeMunicipality ? "All rec centres" : "All rec centres in Greater Victoria"}</option>
+                <option value="">{activeMunicipality ? "All rec centres" : HERO_COPY.allVenues}</option>
                 {venues.map((venue) => (
                   <option key={venue} value={venue}>
                     {venue}
@@ -493,7 +510,7 @@ export default function HomeClient({
           <div className="trust-card">
             <div className="trust-kicker">Coverage</div>
             <div className="trust-copy">
-              Victoria-area municipal rec centres, community schedules, and UVic CARSA where times are publicly posted, so locals can check one site instead of bouncing between rec pages.
+              {HERO_COPY.coverage}
             </div>
           </div>
           <div className="trust-card">
@@ -514,16 +531,18 @@ export default function HomeClient({
               .
             </div>
           </div>
-          <div className="trust-card">
-            <div className="trust-kicker">Contact</div>
-            <div className="trust-copy">
-              Call or text{" "}
-              <a href={`tel:${contactPhone.tel}`} className="inline-link">
-                {contactPhone.display}
-              </a>
-              .
+          {CITY.contactPhone ? (
+            <div className="trust-card">
+              <div className="trust-kicker">Contact</div>
+              <div className="trust-copy">
+                Call or text{" "}
+                <a href={`tel:${CITY.contactPhone.tel}`} className="inline-link">
+                  {CITY.contactPhone.display}
+                </a>
+                .
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
       </div>
     </main>

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import CampsLanding, { campPageData, campSeasonMeta } from "../CampsLanding";
 import { CAMP_SEASONS, getCampSeason, type CampSeason } from "../../lib/camps";
 import { SITE_NAME } from "../../lib/seo";
+import { CITY } from "../../lib/city";
 
 type Props = { params: Promise<{ season: string }> };
 
@@ -14,7 +15,8 @@ const SEASON_KEYWORDS: Record<CampSeason, string[]> = {
 };
 
 export function generateStaticParams() {
-  return CAMP_SEASONS.map((season) => ({ season: season.slug }));
+  // Victoria-only section: other cities build no season pages, so they 404.
+  return CITY.hasCamps ? CAMP_SEASONS.map((season) => ({ season: season.slug })) : [];
 }
 
 export const dynamicParams = false;
@@ -22,7 +24,7 @@ export const revalidate = 3600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { season } = await params;
-  if (!getCampSeason(season)) return {};
+  if (!CITY.hasCamps || !getCampSeason(season)) return {};
   const slug = season as CampSeason;
   const { summary } = campPageData(slug);
   const { title, description, year } = campSeasonMeta(slug, summary);
@@ -39,6 +41,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CampSeasonPage({ params }: Props) {
   const { season } = await params;
-  if (!getCampSeason(season)) notFound();
+  if (!CITY.hasCamps || !getCampSeason(season)) notFound();
   return <CampsLanding season={season as CampSeason} />;
 }

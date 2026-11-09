@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DEMO_MODE } from "../lib/demo";
+import { CITY } from "../lib/city";
 import { API_BASE, getSportMeta } from "../lib/utils";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "../components/SportIcons";
 
@@ -38,10 +39,10 @@ export default function SportsPageClient({ demoSports }: { demoSports: SportCoun
     <main className="page">
       <div className="container">
         <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>
-          Drop-in Sports in Victoria BC
+          Drop-in Sports in {CITY.name} BC
         </h1>
         <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
-          Browse all available sports across Greater Victoria recreation centres.
+          Browse all available sports across {CITY.region} recreation centres.
         </p>
         <div className="sport-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
           {sports.map(({ sport, count }) => {

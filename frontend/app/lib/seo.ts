@@ -1,11 +1,16 @@
-import snapshot from "../../data/demo-snapshot.json";
+import snapshot from "@clubhub/snapshot";
 import { getDateKey, getSportMeta, getTodayKey, venueSlug } from "./utils";
 import { getVenueClosure } from "./closures";
+import { CITY, forCity } from "./city";
 
-export const SITE_URL = "https://clubhubvictoria.ca";
-export const SITE_NAME = "ClubHub Victoria";
-export const SITE_DESCRIPTION =
-  "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Victoria, BC and Greater Victoria in one place.";
+export const SITE_URL = CITY.siteUrl;
+export const SITE_NAME = CITY.siteName;
+export const SITE_DESCRIPTION = forCity({
+  victoria:
+    "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Victoria, BC and Greater Victoria in one place.",
+  vancouver:
+    "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Vancouver, Burnaby, Richmond and Metro Vancouver in one place.",
+});
 
 export type SnapshotEvent = {
   sport_type: string;
@@ -44,7 +49,7 @@ interface VenueSeo {
 }
 
 // Venues behind the site's top Google queries get hand-written copy.
-const VENUE_SEO: Record<string, VenueSeo> = {
+const VICTORIA_VENUE_SEO: Record<string, VenueSeo> = {
   "henderson-recreation-centre": {
     searchName: "Henderson Rec Centre",
     alternateNames: ["Henderson Recreation Center", "Henderson Rec Center", "Henderson Centre Oak Bay"],
@@ -206,6 +211,11 @@ const VENUE_SEO: Record<string, VenueSeo> = {
   },
 };
 
+// ClubHub Vancouver has no Search Console history yet; add venues here once it does.
+const VANCOUVER_VENUE_SEO: Record<string, VenueSeo> = {};
+
+const VENUE_SEO = forCity({ victoria: VICTORIA_VENUE_SEO, vancouver: VANCOUVER_VENUE_SEO });
+
 export function getVenueSeo(slug: string): VenueSeo | undefined {
   return VENUE_SEO[slug];
 }
@@ -219,7 +229,10 @@ export function venuePageHeading(slug: string, fallbackName: string): string {
 }
 
 // One activity at one venue ("CARSA yoga schedule"), keyed "venue-slug/sport".
-const VENUE_SPORT_SEO: Record<string, Omit<VenueSeo, "searchName" | "alternateNames" | "address">> = {
+type VenueSportSeo = Omit<VenueSeo, "searchName" | "alternateNames" | "address">;
+const VENUE_SPORT_SEO = forCity<Record<string, VenueSportSeo>>({
+  vancouver: {},
+  victoria: {
   "carsa-vikes-recreation/yoga": {
     metaTitle: "CARSA Yoga Schedule: UVic Drop-In Yoga Classes",
     metaDescription:
@@ -244,7 +257,8 @@ const VENUE_SPORT_SEO: Record<string, Omit<VenueSeo, "searchName" | "alternateNa
       },
     ],
   },
-};
+  },
+});
 
 // Activity pages need enough sessions to be worth a search result of their own.
 export const MIN_VENUE_SPORT_SESSIONS = 6;
@@ -303,7 +317,7 @@ export function getVenueSnapshot(slug: string) {
   const venueEvents = upcomingEvents().filter((event) => venueSlug(event.venue_name) === slug);
   const closure = getVenueClosure(slug);
   const venueName = venueEvents[0]?.venue_name || closure?.venueName || titleFromSlug(slug);
-  const municipality = venueEvents[0]?.municipality || closure?.municipality || "Greater Victoria";
+  const municipality = venueEvents[0]?.municipality || closure?.municipality || CITY.region;
   const sportCounts = new Map<string, number>();
   for (const event of venueEvents) {
     sportCounts.set(event.sport_type, (sportCounts.get(event.sport_type) || 0) + 1);

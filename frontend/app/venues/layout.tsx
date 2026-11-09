@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
+import { CITY } from "../lib/city";
 
 export const metadata: Metadata = {
   title: {
-    default: "Victoria Rec Centre Schedules",
-    template: "%s | ClubHub Victoria",
+    default: `${CITY.name} Rec Centre Schedules`,
+    template: `%s | ${CITY.siteName}`,
   },
-  description:
-    "Browse current drop-in schedules for recreation centres, pools and community centres across Victoria, BC and Greater Victoria.",
+  description: `Browse current drop-in schedules for recreation centres, pools and community centres across ${CITY.place} and ${CITY.region}.`,
   alternates: {
     canonical: "/venues",
   },
   openGraph: {
-    title: "Victoria Rec Centre Schedules | ClubHub Victoria",
-    description:
-      "Browse current drop-in schedules for recreation centres, pools and community centres across Greater Victoria.",
+    title: `${CITY.name} Rec Centre Schedules | ${CITY.siteName}`,
+    description: `Browse current drop-in schedules for recreation centres, pools and community centres across ${CITY.region}.`,
     url: "/venues",
     type: "website",
   },

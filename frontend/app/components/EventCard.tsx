@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { CITY } from "../lib/city";
 import {
   EventData,
   formatAges,
@@ -56,7 +57,7 @@ export default function EventCard({
       name: event.venue_name,
       address: {
         "@type": "PostalAddress",
-        addressLocality: event.municipality || "Victoria",
+        addressLocality: event.municipality || CITY.name,
         addressRegion: "BC",
         addressCountry: "CA",
       },

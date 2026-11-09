@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
-import snapshot from "../data/demo-snapshot.json";
+import snapshot from "@clubhub/snapshot";
 import { venueSlug } from "./lib/utils";
 import { VENUE_CLOSURES } from "./lib/closures";
 import { venueSportPages } from "./lib/seo";
 import { activityPages, areaPages, sportPages } from "./lib/searchPages";
 import { CAMP_SEASONS } from "./lib/camps";
+import { CITY } from "./lib/city";
 
-const siteUrl = "https://clubhubvictoria.ca";
+const siteUrl = CITY.siteUrl;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // Google recommends an accurate lastmod value, not the time the sitemap was requested.
@@ -46,12 +47,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.8,
     },
-    {
-      url: `${siteUrl}/camps`,
-      lastModified: snapshotModified,
-      changeFrequency: "daily",
-      priority: 0.85,
-    },
+    ...(CITY.hasCamps
+      ? [
+          {
+            url: `${siteUrl}/camps`,
+            lastModified: snapshotModified,
+            changeFrequency: "daily" as const,
+            priority: 0.85,
+          },
+        ]
+      : []),
   ];
 
   // Only sports with upcoming sessions; an empty sport page isn't worth indexing.
@@ -83,7 +88,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.6,
     }));
 
-  const campUrls = CAMP_SEASONS.map(({ slug }) => ({
+  const campUrls = (CITY.hasCamps ? CAMP_SEASONS : []).map(({ slug }) => ({
     url: `${siteUrl}/camps/${slug}`,
     lastModified: snapshotModified,
     changeFrequency: "daily" as const,

@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CITY } from "../../lib/city";
 import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../components/LandingSchedulePage";
 import { getSportMeta, SPORT_META, venueSlug } from "../../lib/utils";
 import { MIN_VENUE_SPORT_SESSIONS, SITE_NAME } from "../../lib/seo";
@@ -35,10 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     path: `/sports/${sport}`,
     count: page.count,
     keywords: [
-      `drop in ${page.label.toLowerCase()} victoria`,
-      `${page.label.toLowerCase()} victoria bc`,
-      `${page.label.toLowerCase()} schedule victoria`,
-      `${page.label.toLowerCase()} today victoria`,
+      `drop in ${page.label.toLowerCase()} ${CITY.searchTerm}`,
+      `${page.label.toLowerCase()} ${CITY.searchTerm} bc`,
+      `${page.label.toLowerCase()} schedule ${CITY.searchTerm}`,
+      `${page.label.toLowerCase()} today ${CITY.searchTerm}`,
       `${SITE_NAME} ${page.label}`,
     ],
   });
@@ -54,7 +55,7 @@ export default async function SportDetailPage({ params, searchParams }: Props) {
 
   const relatedLinks = [
     // Kids' sessions include camp days; the full camp listings live on /camps.
-    ...(sport === "kids" ? [{ href: "/camps", label: "Kids camps", featured: true }] : []),
+    ...(sport === "kids" && CITY.hasCamps ? [{ href: "/camps", label: "Kids camps", featured: true }] : []),
     ...activityPages()
       .filter((activity) => activity.sport === sport)
       .map((activity) => ({
@@ -77,12 +78,12 @@ export default async function SportDetailPage({ params, searchParams }: Props) {
       searchParams={searchParams}
       path={`/sports/${sport}`}
       heading={page.copy.heading}
-      kicker="Greater Victoria"
+      kicker={CITY.region}
       shortName={page.label.toLowerCase()}
       subtitle={`${page.count} upcoming sessions at ${page.venues.length} ${page.venues.length === 1 ? "venue" : "venues"}`}
       summary={venueNames.length ? `${page.copy.summary} Venues include ${venueListLabel(venueNames, 4)}.` : page.copy.summary}
-      aboutTitle={`${page.label} across Greater Victoria`}
-      collectionName={`${page.label} in Victoria, BC`}
+      aboutTitle={`${page.label} across ${CITY.region}`}
+      collectionName={`${page.label} in ${CITY.place}`}
       breadcrumbs={[
         { name: "Home", path: "/" },
         { name: "Sports", path: "/sports" },

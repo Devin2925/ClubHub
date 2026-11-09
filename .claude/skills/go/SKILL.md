@@ -1,23 +1,25 @@
 ---
 name: go
-description: Run the whole ClubHub refresh end to end - scrape ClubHub Victoria and ClubHub Vancouver, fix whatever the reports flag (changed PDFs, broken scrapers, new junk rows, unknown venues), publish Victoria's site, and report back. Use when Devin says "go", "/go", "it's that time again", "refresh", "run the scrape" or similar in the ClubHub repo.
+description: Run the whole ClubHub refresh end to end - scrape ClubHub Victoria and ClubHub Vancouver, fix whatever the reports flag (changed PDFs, broken scrapers, new junk rows, unknown venues), publish both sites, and report back. Use when Devin says "go", "/go", "it's that time again", "refresh", "run the scrape" or similar in the ClubHub repo.
 ---
 
 # ClubHub "go"
 
 Devin's standing request: when he says "go", run the full refresh for both cities without
-asking, fix what breaks, publish Victoria, and tell him what happened.
+asking, fix what breaks, publish both sites, and tell him what happened.
 
 **Pre-approved for this routine:** committing and pushing `frontend/data/demo-snapshot.json`
-(the scripts do this), and committing and pushing the fixes you make during the run:
+and `frontend/data/vancouver-snapshot.json` (the scripts do this), and committing and pushing the fixes you make during the run:
 scraper fixes, `KNOWN_NOISE` entries, registry entries, `VENUE_ALIASES`, filter patterns.
 Commit only the exact files you changed.
 
 **Ask first:** retiring a source or deleting its rows, frontend/page changes, committing
 anyone else's uncommitted work, or `--force` over a flag you haven't verified is expected.
 
-The two cities never mix: Victoria = `backend/clubhub.db` → snapshot → clubhubvictoria.ca;
-Vancouver = `backend/clubhub_vancouver.db` (no public site yet).
+The two cities never mix: Victoria = `backend/clubhub.db` → `demo-snapshot.json` → clubhubvictoria.ca;
+Vancouver = `backend/clubhub_vancouver.db` → `vancouver-snapshot.json` → clubhubvancouver.ca.
+It's one Next app deployed twice: the Vercel project `clubhub-vancouver` builds with
+`NEXT_PUBLIC_CITY=vancouver` (see `frontend/app/lib/city.ts`). Both deploy on every push to main.
 
 ## 0. Preflight
 
@@ -37,14 +39,18 @@ They use different databases, so run both in the background and wait for both:
 
 ```sh
 ./update_public_site.sh      # Victoria: scrape, report, export, build, publish, confirm live (5-10 min)
-./update_vancouver.sh        # Vancouver: scrape 12 sources, report, registry check (~5 min)
+./update_vancouver.sh        # Vancouver: scrape 12 sources, report, registry check, export, publish, confirm (~5 min)
 ```
+
+Only Victoria's script runs `next build` locally (Vancouver relies on Vercel's build), so they
+don't collide in `frontend/`. Both commit just their own snapshot and retry the push if the
+other got there first.
 
 | Exit | Victoria (`update_public_site.sh`) | Vancouver (`update_vancouver.sh`) |
 |---|---|---|
-| 0 | Published and Vercel deployed | Every source OK, registry matches |
-| 2 | Stopped at the report, **nothing published** | Report or registry check flagged something |
-| 1 | Build or deploy broke | Sync crashed |
+| 0 | Published and Vercel deployed | Every source OK, registry matches, published |
+| 2 | Stopped at the report, **nothing published** | Report or registry check flagged something, **nothing published** |
+| 1 | Build or deploy broke | Sync, export, push or Vercel deploy broke |
 
 Logs: `backend/logs/refresh-<stamp>.log` (Victoria) and `backend/logs/vancouver-refresh-<stamp>.log`.
 REFRESH.md explains the report verdicts (OK / KNOWN / CHECK / FAILED / SKIPPED / STALE).
@@ -109,22 +115,26 @@ Then decide which case it is:
 
 1. Commit your fixes first, naming only the files you changed:
    `git add <files> && git commit -m "<what broke and how it's fixed>" && git push`.
-2. If `update_public_site.sh` exited 0, the site is already live. Otherwise run
-   `./update_public_site.sh --skip-sync` to re-check, build, publish and confirm.
+2. If a script exited 0, that site is already live. Otherwise rerun it without scraping to
+   re-check, publish and confirm: `./update_public_site.sh --skip-sync` (Victoria) or
+   `./update_vancouver.sh --skip-sync` (Vancouver).
    - Use `--force` only when every remaining flag is verified expected.
    - Prefer adding the flag to `KNOWN_NOISE`, so it won't flag again next time.
 3. The script confirms the deploy through Vercel's GitHub status, then the sitemap. A
    403 with `x-vercel-mitigated` is Vercel's bot challenge, not a failed deploy.
    Pages are client-rendered, so to eyeball the live data, render the page with Playwright
    (`backend/venv` has chromium) instead of curl.
-4. Vancouver has nothing to publish until its site exists; update this skill when it does.
+4. Vancouver's deploy check finds the `clubhub-vancouver` project's status by its link
+   (`VERCEL_PROJECT` in `update_vancouver.sh`). "No Vercel deploy status" means the project
+   isn't connected or is still building; look at the Vercel dashboard. A failed Vancouver
+   build keeps its previous deploy live and never affects Victoria.
 
 ## 4. Report to Devin
 
 Keep it short:
 - **Victoria:** published or not, upcoming sessions by area, and what flagged and what you
   did about each.
-- **Vancouver:** sessions by city, what flagged and what you did.
+- **Vancouver:** published or not, sessions by city, what flagged and what you did.
 - **Fixes:** each fix you committed, with its commit hash.
 - **Needs Devin:** anything that's his call, such as a source to retire, a closure notice,
   or a new venue worth a page.

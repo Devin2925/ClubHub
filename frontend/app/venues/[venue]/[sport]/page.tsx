@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CITY } from "../../../lib/city";
 import VenueScheduleClient from "../../../components/VenueScheduleClient";
 import { DEMO_MODE } from "../../../lib/demo";
 import { getDemoEvents, sessionNotes } from "../../../lib/snapshot.server";
@@ -126,7 +127,7 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
           updatedLabel={snapshotUpdatedLabel()}
           relatedLinks={[
             { href: `/venues/${venue}`, label: `All ${page.displayName} activities` },
-            { href: `/sports/${sport}`, label: `${page.label} across Greater Victoria` },
+            { href: `/sports/${sport}`, label: `${page.label} across ${CITY.region}` },
           ]}
           hideSportFilter
           notes={notes}

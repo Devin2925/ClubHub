@@ -4,6 +4,7 @@
 import { getUnfinishedEvents } from "./snapshot.server";
 import { eventMatcher, type EventFilter } from "./schedule";
 import { getSportMeta, nowScheduleKey, SPORT_META, venueSlug, type EventData } from "./utils";
+import { CITY, forCity, IS_VICTORIA } from "./city";
 
 interface LandingCopy {
   // Search-result title; the root layout appends the site name.
@@ -15,7 +16,7 @@ interface LandingCopy {
 }
 
 // Sports whose searches don't follow "drop-in <sport>".
-const SPORT_COPY: Record<string, LandingCopy> = {
+const VICTORIA_SPORT_COPY: Record<string, LandingCopy> = {
   swimming: {
     title: "Swim Times in Victoria, BC Today: Lane & Public Swims",
     heading: "Swimming in Victoria today",
@@ -55,13 +56,53 @@ const SPORT_COPY: Record<string, LandingCopy> = {
   },
 };
 
+const VANCOUVER_SPORT_COPY: Record<string, LandingCopy> = {
+  swimming: {
+    title: "Swim Times in Vancouver, BC Today: Lane & Public Swims",
+    heading: "Swimming in Vancouver today",
+    summary: "Lane swims, public and family swims, aquafit and leisure pool times at pools across Metro Vancouver.",
+  },
+  skating: {
+    title: "Public Skating in Vancouver, BC: Today's Skate Times",
+    heading: "Public skating in Vancouver today",
+    summary: "Public, family, adult and parent-and-tot skates at rinks across Metro Vancouver.",
+  },
+  hockey: {
+    title: "Drop-In Hockey in Vancouver, BC: Shinny & Stick and Puck",
+    heading: "Drop-in hockey in Vancouver today",
+    summary: "Adult drop-in hockey, shinny, and stick and puck ice times at rinks across Metro Vancouver.",
+  },
+  yoga: {
+    title: "Drop-In Yoga in Vancouver, BC: Today's Classes",
+    heading: "Drop-in yoga in Vancouver today",
+    summary: "Hatha, vinyasa, yin, gentle and chair yoga classes at community centres and rec centres across Metro Vancouver.",
+  },
+  fitness: {
+    title: "Drop-In Fitness Classes in Vancouver, BC Today",
+    heading: "Drop-in fitness classes in Vancouver today",
+    summary: "Spin, circuit, strength, Zumba, Pilates and fitness centre drop-in times at rec centres across Metro Vancouver.",
+  },
+  other: {
+    title: "Community Centre Drop-Ins in Vancouver, BC Today",
+    heading: "Community centre drop-ins in Vancouver today",
+    summary: "Seniors' socials, youth drop-ins, playgroups, dance and other community centre programs across Metro Vancouver.",
+  },
+  kids: {
+    title: "Kids' Drop-In Programs in Vancouver, BC Today",
+    heading: "Kids' drop-ins in Vancouver today",
+    summary: "Parent-and-tot gyms, playgroups and other drop-in programs for kids across Metro Vancouver.",
+  },
+};
+
+const SPORT_COPY = forCity({ victoria: VICTORIA_SPORT_COPY, vancouver: VANCOUVER_SPORT_COPY });
+
 export function getSportCopy(sport: string): LandingCopy {
   const label = getSportMeta(sport).label;
   return (
     SPORT_COPY[sport] || {
-      title: `Drop-In ${label} in Victoria, BC Today`,
-      heading: `Drop-in ${label.toLowerCase()} in Victoria today`,
-      summary: `Drop-in ${label.toLowerCase()} times at rec centres and community centres across Greater Victoria.`,
+      title: `Drop-In ${label} in ${CITY.place} Today`,
+      heading: `Drop-in ${label.toLowerCase()} in ${CITY.name} today`,
+      summary: `Drop-in ${label.toLowerCase()} times at rec centres and community centres across ${CITY.region}.`,
     }
   );
 }
@@ -74,7 +115,7 @@ export interface ActivityPage extends LandingCopy {
 }
 
 // Kinds of session people search for by name, matched on session titles.
-export const ACTIVITY_PAGES: ActivityPage[] = [
+const VICTORIA_ACTIVITY_PAGES: ActivityPage[] = [
   {
     sport: "swimming",
     slug: "lane-swimming",
@@ -155,6 +196,49 @@ export const ACTIVITY_PAGES: ActivityPage[] = [
   },
 ];
 
+// Vancouver uses the same session matching with its own wording.
+const VANCOUVER_ACTIVITY_COPY: Record<string, LandingCopy> = {
+  "lane-swimming": {
+    title: "Lane Swimming in Vancouver, BC Today: Lengths Times",
+    heading: "Lane swimming in Vancouver today",
+    summary: "Lengths, lap and lane swim times at pools across Metro Vancouver.",
+  },
+  "public-swimming": {
+    title: "Public Swims in Vancouver, BC Today: Leisure & Family Swim Times",
+    heading: "Public swims in Vancouver today",
+    summary: "Public, leisure, family and open swims at pools across Metro Vancouver.",
+  },
+  aquafit: {
+    title: "Aquafit in Vancouver, BC: Today's Aquafit & Water Walking Classes",
+    heading: "Aquafit in Vancouver today",
+    summary: "Shallow and deep water aquafit, water walking and other pool fitness classes across Metro Vancouver.",
+  },
+  "public-skating": {
+    title: "Public Skating in Vancouver, BC Today: Family & Adult Skates",
+    heading: "Public skating in Vancouver today",
+    summary: "Public, family, adult, youth and parent-and-tot skates at rinks across Metro Vancouver.",
+  },
+  "stick-and-puck": {
+    title: "Stick and Puck in Vancouver, BC: Today's Ice Times",
+    heading: "Stick and puck in Vancouver today",
+    summary: "Stick and puck ice times for skaters and goalies at rinks across Metro Vancouver.",
+  },
+  "drop-in-hockey": {
+    title: "Drop-In Hockey & Shinny in Vancouver, BC Today",
+    heading: "Drop-in hockey in Vancouver today",
+    summary: "Adult drop-in hockey, shinny and scrimmages for skaters and goalies at rinks across Metro Vancouver.",
+  },
+  "spin-classes": {
+    title: "Spin & Indoor Cycling Classes in Vancouver, BC Today",
+    heading: "Spin classes in Vancouver today",
+    summary: "Indoor cycling and spin classes at rec centres and community centres across Metro Vancouver.",
+  },
+};
+
+export const ACTIVITY_PAGES: ActivityPage[] = IS_VICTORIA
+  ? VICTORIA_ACTIVITY_PAGES
+  : VICTORIA_ACTIVITY_PAGES.map((page) => ({ ...page, ...VANCOUVER_ACTIVITY_COPY[page.slug] }));
+
 export function getActivityPage(sport: string, slug: string): ActivityPage | undefined {
   return ACTIVITY_PAGES.find((page) => page.sport === sport && page.slug === slug);
 }
@@ -167,7 +251,7 @@ interface AreaCopy {
 }
 
 // Keyed by the snapshot's municipality value.
-const AREA_COPY: Record<string, AreaCopy> = {
+const VICTORIA_AREA_COPY: Record<string, AreaCopy> = {
   Saanich: { name: "Saanich", title: "Saanich Rec Centre Drop-In Schedule Today" },
   "Oak Bay": { name: "Oak Bay", title: "Oak Bay Recreation Drop-In Schedule Today" },
   Victoria: { name: "Victoria", title: "City of Victoria Community Centre Drop-Ins Today" },
@@ -185,6 +269,16 @@ const AREA_COPY: Record<string, AreaCopy> = {
     places: "Sidney, North Saanich and Central Saanich",
   },
 };
+
+const VANCOUVER_AREA_COPY: Record<string, AreaCopy> = {
+  Vancouver: { name: "Vancouver", title: "Vancouver Community Centre Drop-In Schedule Today" },
+  Burnaby: { name: "Burnaby", title: "Burnaby Rec Centre Drop-In Schedule Today" },
+  "North Vancouver": { name: "North Vancouver", title: "North Vancouver Drop-In Schedule Today: NVRC" },
+  Richmond: { name: "Richmond", title: "Richmond Community Centre Drop-In Schedule Today" },
+  Coquitlam: { name: "Coquitlam", title: "Coquitlam Rec Centre Drop-In Schedule Today" },
+};
+
+const AREA_COPY = forCity({ victoria: VICTORIA_AREA_COPY, vancouver: VANCOUVER_AREA_COPY });
 
 export function getAreaCopy(municipality: string): AreaCopy {
   return (

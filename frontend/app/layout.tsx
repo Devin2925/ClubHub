@@ -3,6 +3,10 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Link from "next/link";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "./lib/seo";
+import { CITY, forCity, IS_VICTORIA } from "./lib/city";
+import { getUnfinishedEvents } from "./lib/snapshot.server";
+import { activityPages, areaPages, getAreaCopy, sportPages } from "./lib/searchPages";
+import { nowScheduleKey, venueSlug } from "./lib/utils";
 
 // Matches the navbar so the phone's status bar blends in.
 export const viewport: Viewport = {
@@ -10,11 +14,22 @@ export const viewport: Viewport = {
 };
 
 // Static metadata
+const SHARE_COPY = forCity({
+  victoria: {
+    title: "ClubHub Victoria | Recreation schedules across Greater Victoria",
+    description: "Track drop-ins, classes, swims, skates, and recreation times across Victoria, BC.",
+  },
+  vancouver: {
+    title: "ClubHub Vancouver | Recreation schedules across Metro Vancouver",
+    description: "Track drop-ins, classes, swims, skates, and recreation times across Vancouver, BC and Metro Vancouver.",
+  },
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "ClubHub Victoria | Drop-In Sports, Classes, and Rec Schedules",
-    template: "%s | ClubHub Victoria",
+    default: `${SITE_NAME} | Drop-In Sports, Classes, and Rec Schedules`,
+    template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
   appleWebApp: {
@@ -22,15 +37,25 @@ export const metadata: Metadata = {
     title: "ClubHub",
     statusBarStyle: "black",
   },
-  keywords: [
-    "ClubHub Victoria",
-    "Victoria BC recreation schedules",
-    "Greater Victoria drop-in sports",
-    "Victoria BC classes and rec centres",
-    "Victoria BC kids camps",
-    "Victoria BC summer camps",
-    "Victoria BC pickleball hockey swimming",
-  ],
+  keywords: forCity({
+    victoria: [
+      "ClubHub Victoria",
+      "Victoria BC recreation schedules",
+      "Greater Victoria drop-in sports",
+      "Victoria BC classes and rec centres",
+      "Victoria BC kids camps",
+      "Victoria BC summer camps",
+      "Victoria BC pickleball hockey swimming",
+    ],
+    vancouver: [
+      "ClubHub Vancouver",
+      "Vancouver BC recreation schedules",
+      "Metro Vancouver drop-in sports",
+      "Vancouver community centre schedules",
+      "Burnaby Richmond Coquitlam drop-ins",
+      "Vancouver BC pickleball hockey swimming",
+    ],
+  }),
   alternates: {
     canonical: SITE_URL,
   },
@@ -46,8 +71,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "ClubHub Victoria | Recreation schedules across Greater Victoria",
-    description: "Track drop-ins, classes, swims, skates, and recreation times across Victoria, BC.",
+    title: SHARE_COPY.title,
+    description: SHARE_COPY.description,
     type: "website",
     locale: "en_CA",
     url: SITE_URL,
@@ -55,12 +80,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "ClubHub Victoria | Recreation schedules across Greater Victoria",
-    description: "Track drop-ins, classes, swims, skates, and recreation times across Victoria, BC.",
+    title: SHARE_COPY.title,
+    description: SHARE_COPY.description,
   },
 };
 
-const contactPhone = { display: "203-979-3744", tel: "+12039793744" };
 // Worded the way people search for these venues (Search Console top queries).
 const campPages = [
   { href: "/camps", label: "Kids camps in Victoria" },
@@ -70,7 +94,7 @@ const campPages = [
   { href: "/camps/summer", label: "Summer camps" },
 ];
 
-const popularSchedules = [
+const victoriaPopularSchedules = [
   { href: "/venues/henderson-recreation-centre", label: "Henderson Rec Centre schedule" },
   { href: "/venues/saanich-commonwealth-place", label: "Commonwealth Pool schedule" },
   { href: "/venues/carsa-vikes-recreation", label: "CARSA drop-in schedule" },
@@ -80,7 +104,7 @@ const popularSchedules = [
   { href: "/venues/crystal-pool-and-fitness-centre", label: "Crystal Pool closure & alternatives" },
 ];
 // Searches that span venues: "lane swim victoria", "drop in basketball victoria".
-const popularActivities = [
+const victoriaPopularActivities = [
   { href: "/sports/swimming/lane-swimming", label: "Lane swimming" },
   { href: "/sports/swimming/public-swimming", label: "Public swims" },
   { href: "/sports/swimming/aquafit", label: "Aquafit" },
@@ -94,7 +118,7 @@ const popularActivities = [
   { href: "/sports/yoga", label: "Drop-in yoga" },
   { href: "/sports/fitness/spin-classes", label: "Spin classes" },
 ];
-const areaSchedules = [
+const victoriaAreaSchedules = [
   { href: "/areas/saanich", label: "Saanich" },
   { href: "/areas/victoria", label: "Victoria" },
   { href: "/areas/oak-bay", label: "Oak Bay" },
@@ -104,6 +128,49 @@ const areaSchedules = [
   { href: "/areas/sooke", label: "Sooke" },
   { href: "/areas/uvic", label: "UVic" },
 ];
+type FooterLink = { href: string; label: string };
+
+// ClubHub Vancouver has no Search Console history yet, so its footer is built from the
+// data: the busiest venues, the activity and sport pages that exist, and every area page.
+function vancouverFooterLinks(): { popularSchedules: FooterLink[]; popularActivities: FooterLink[]; areaSchedules: FooterLink[] } {
+  const venueCounts = new Map<string, number>();
+  for (const event of getUnfinishedEvents(nowScheduleKey())) {
+    if (event.sport_type === "other") continue;
+    venueCounts.set(event.venue_name, (venueCounts.get(event.venue_name) || 0) + 1);
+  }
+  const popularSchedules = Array.from(venueCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 7)
+    .map(([name]) => ({ href: `/venues/${venueSlug(name)}`, label: `${name} schedule` }));
+  const livePaths = new Set([
+    ...activityPages().map(({ sport, slug }) => `/sports/${sport}/${slug}`),
+    ...sportPages().map(({ sport }) => `/sports/${sport}`),
+  ]);
+  const popularActivities = victoriaPopularActivities.filter((link) => livePaths.has(link.href));
+  const areaSchedules = areaPages().map(({ slug, municipality }) => ({
+    href: `/areas/${slug}`,
+    label: getAreaCopy(municipality).name,
+  }));
+  return { popularSchedules, popularActivities, areaSchedules };
+}
+
+function footerGroups(): { label: string; links: FooterLink[] }[] {
+  if (IS_VICTORIA) {
+    return [
+      { label: "Popular schedules", links: victoriaPopularSchedules },
+      { label: "Drop-ins by activity", links: victoriaPopularActivities },
+      { label: "Drop-ins by area", links: victoriaAreaSchedules },
+      { label: "Kids camps", links: campPages },
+    ];
+  }
+  const links = vancouverFooterLinks();
+  return [
+    { label: "Popular schedules", links: links.popularSchedules },
+    { label: "Drop-ins by activity", links: links.popularActivities },
+    { label: "Drop-ins by area", links: links.areaSchedules },
+  ];
+}
+
 const brandMark = (
   <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ marginRight: 6 }}>
     <defs>
@@ -143,14 +210,18 @@ export default function RootLayout({
     logo: `${SITE_URL}/icon-512.png`,
     areaServed: {
       "@type": "AdministrativeArea",
-      name: "Greater Victoria, British Columbia",
+      name: `${CITY.region}, British Columbia`,
     },
-    contactPoint: {
-      "@type": "ContactPoint",
-      contactType: "customer support",
-      telephone: "+1-203-979-3744",
-      areaServed: "CA",
-    },
+    ...(CITY.contactPhone
+      ? {
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            telephone: CITY.contactPhone.schema,
+            areaServed: "CA",
+          },
+        }
+      : {}),
   };
   const websiteJsonLd = {
     "@context": "https://schema.org",
@@ -194,9 +265,11 @@ export default function RootLayout({
               <Link href="/venues" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
                 Rec Centres
               </Link>
-              <Link href="/camps" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
-                Camps
-              </Link>
+              {CITY.hasCamps ? (
+                <Link href="/camps" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
+                  Camps
+                </Link>
+              ) : null}
               <Link href="/status" style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
                 Status
               </Link>
@@ -209,17 +282,12 @@ export default function RootLayout({
         <footer style={{ borderTop: "1px solid var(--border-color)", padding: "3rem 0", textAlign: "center", background: "var(--bg-glass)" }}>
           <div className="container">
             <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: "0.5rem" }}>
-              Club<strong>Hub</strong> Victoria
+              Club<strong>Hub</strong> {CITY.name}
             </div>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
-              Recreation schedules for drop-ins, classes, and community activities across Victoria, BC and Greater Victoria.
+              Recreation schedules for drop-ins, classes, and community activities across {CITY.place} and {CITY.region}.
             </p>
-            {[
-              { label: "Popular schedules", links: popularSchedules },
-              { label: "Drop-ins by activity", links: popularActivities },
-              { label: "Drop-ins by area", links: areaSchedules },
-              { label: "Kids camps", links: campPages },
-            ].map((group) => (
+            {footerGroups().map((group) => (
               <nav key={group.label} className="footer-popular" aria-label={group.label}>
                 <span className="footer-popular-label">{group.label}</span>
                 {group.links.map((item) => (
@@ -230,14 +298,16 @@ export default function RootLayout({
               </nav>
             ))}
             <div className="footer-trust-links">
-              <span>Victoria, BC schedule aggregator</span>
+              <span>{CITY.place} schedule aggregator</span>
               <span>Upcoming dates only</span>
-              <span>
-                Contact:{" "}
-                <a href={`tel:${contactPhone.tel}`} className="inline-link">
-                  {contactPhone.display}
-                </a>
-              </span>
+              {CITY.contactPhone ? (
+                <span>
+                  Contact:{" "}
+                  <a href={`tel:${CITY.contactPhone.tel}`} className="inline-link">
+                    {CITY.contactPhone.display}
+                  </a>
+                </span>
+              ) : null}
             </div>
           </div>
         </footer>

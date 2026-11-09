@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { CITY } from "./lib/city";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -6,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://clubhubvictoria.ca/sitemap.xml",
-    host: "https://clubhubvictoria.ca",
+    sitemap: `${CITY.siteUrl}/sitemap.xml`,
+    host: CITY.siteUrl,
   };
 }

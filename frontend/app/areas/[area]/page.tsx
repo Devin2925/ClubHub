@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CITY } from "../../lib/city";
 import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../components/LandingSchedulePage";
 import { getSportMeta, nowScheduleKey, venueSlug } from "../../lib/utils";
 import { findArea, getAreaCopy, sessionCount, venueCounts, venueListLabel } from "../../lib/searchPages";
@@ -76,7 +77,7 @@ export default async function AreaPage({ params, searchParams }: Props) {
         { name: "Home", path: "/" },
         { name: page.copy.name, path: `/areas/${area}` },
       ]}
-      back={{ name: "All of Greater Victoria", path: "/" }}
+      back={{ name: `All of ${CITY.region}`, path: "/" }}
       relatedLinks={page.venues.map(([name, count]) => ({ href: `/venues/${venueSlug(name)}`, label: name, count }))}
     />
   );

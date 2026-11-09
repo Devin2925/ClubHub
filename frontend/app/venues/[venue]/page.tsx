@@ -6,6 +6,7 @@ import { getUpcomingCamps } from "../../lib/campPages.server";
 import { getCampSeason } from "../../lib/camps";
 import { DEMO_MODE } from "../../lib/demo";
 import { getDemoEvents, sessionNotes } from "../../lib/snapshot.server";
+import { CITY, IS_VICTORIA } from "../../lib/city";
 import { readDateParam, readParam } from "../../lib/schedule";
 import {
   API_BASE,
@@ -22,6 +23,7 @@ import {
   MIN_VENUE_SPORT_SESSIONS,
   serializeJsonLd,
   SITE_NAME,
+  SITE_URL,
   snapshotUpdatedLabel,
   venuePageHeading,
   venueSportCounts,
@@ -47,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? `${displayTitle} Schedule: ${closureHeadline(closure)}`
       : `${displayTitle} Drop-In Schedule`);
   const description = closure
-    ? `${seo?.metaDescription || seo?.summary || `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. See nearby pool swim times and the interim Victoria Recreation Centre plans.`} ${updated}`
+    ? `${seo?.metaDescription || seo?.summary || `${displayTitle} is ${closureHeadline(closure).toLowerCase()}. ${IS_VICTORIA ? "See nearby pool swim times and the interim Victoria Recreation Centre plans." : "See nearby schedules while it is closed."}`} ${updated}`
     : seo && venueData.eventCount > 0
       ? `${seo.metaDescription || `${seo.summary} ${venueData.eventCount} upcoming sessions with times and dates.`} ${updated}`
       : venueData.eventCount > 0
@@ -59,7 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: [
       `${venueData.venueName} schedule`,
-      `${venueData.venueName} Victoria BC`,
+      `${venueData.venueName} ${CITY.name} BC`,
       `${venueData.venueName} drop-in`,
       ...(searchName ? [`${searchName} schedule`, `${searchName} drop-in`] : []),
       ...(seo?.alternateNames || []).flatMap((name) => [`${name} schedule`, `${name} drop-in`]),
@@ -109,7 +111,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
   const events = venueEvents.map((event) => ({ ...event, description: "", last_fetched: "", source_id: "" }));
   const closure = getVenueClosure(resolvedParams.venue);
   const venueName = events[0]?.venue_name || closure?.venueName || resolvedParams.venue;
-  const municipality = events[0]?.municipality || closure?.municipality || "Greater Victoria";
+  const municipality = events[0]?.municipality || closure?.municipality || CITY.region;
   const seo = getVenueSeo(resolvedParams.venue);
   const searchName = getVenueSearchName(resolvedParams.venue);
   const pageHeading = venuePageHeading(resolvedParams.venue, venueName);
@@ -128,7 +130,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
     ...(searchName || seo?.alternateNames?.length
       ? { alternateName: [searchName, ...(seo?.alternateNames || [])].filter(Boolean) }
       : {}),
-    url: `https://clubhubvictoria.ca/venues/${resolvedParams.venue}`,
+    url: `${SITE_URL}/venues/${resolvedParams.venue}`,
     address: {
       "@type": "PostalAddress",
       ...(seo?.address ? { streetAddress: seo.address.split(",")[0] } : {}),
@@ -176,19 +178,19 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
         "@type": "ListItem",
         position: 1,
         name: "Home",
-        item: "https://clubhubvictoria.ca",
+        item: SITE_URL,
       },
       {
         "@type": "ListItem",
         position: 2,
         name: "Rec Centres",
-        item: "https://clubhubvictoria.ca/venues",
+        item: `${SITE_URL}/venues`,
       },
       {
         "@type": "ListItem",
         position: 3,
         name: venueName,
-        item: `https://clubhubvictoria.ca/venues/${resolvedParams.venue}`,
+        item: `${SITE_URL}/venues/${resolvedParams.venue}`,
       },
     ],
   };
@@ -229,7 +231,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
             <h2 className="section-title">Kids camps at {searchName || venueName}</h2>
             <p className="section-copy">
               {venueCamps.length} upcoming {venueCamps.length === 1 ? "camp" : "camps"} with dates, ages and spots left. More
-              across Greater Victoria:{" "}
+              across {CITY.region}:{" "}
               {campSeasons.map((season, index) => (
                 <span key={season}>
                   {index ? ", " : ""}

@@ -1,6 +1,6 @@
 // Server-only: importing the snapshot here keeps the multi-megabyte JSON out of
 // browser bundles. Client components get data through props or /events.json.
-import snapshot from "../../data/demo-snapshot.json";
+import snapshot from "@clubhub/snapshot";
 import type {
   DemoCampSourceRow,
   DemoSnapshot,

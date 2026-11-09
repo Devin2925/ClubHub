@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CITY } from "../../../lib/city";
 import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../../components/LandingSchedulePage";
 import { getSportMeta, venueSlug } from "../../../lib/utils";
 import {
@@ -27,10 +28,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     path: `/sports/${sport}/${activity}`,
     count,
     keywords: [
-      `${page.label.toLowerCase()} victoria`,
-      `${page.label.toLowerCase()} victoria bc`,
+      `${page.label.toLowerCase()} ${CITY.searchTerm}`,
+      `${page.label.toLowerCase()} ${CITY.searchTerm} bc`,
       `${page.label.toLowerCase()} today`,
-      `${page.label.toLowerCase()} schedule victoria`,
+      `${page.label.toLowerCase()} schedule ${CITY.searchTerm}`,
     ],
   });
 }
@@ -59,7 +60,7 @@ export default async function ActivityPage({ params, searchParams }: Props) {
       searchParams={searchParams}
       path={`/sports/${sport}/${activity}`}
       heading={page.heading}
-      kicker="Greater Victoria"
+      kicker={CITY.region}
       shortName={page.label.toLowerCase()}
       subtitle={`${count} upcoming sessions at ${venues.length} ${venues.length === 1 ? "venue" : "venues"}`}
       summary={
@@ -67,8 +68,8 @@ export default async function ActivityPage({ params, searchParams }: Props) {
           ? `${page.summary} Venues include ${venueListLabel(venues.map(([name]) => name), 4)}.`
           : page.summary
       }
-      aboutTitle={`${page.label} across Greater Victoria`}
-      collectionName={`${page.label} in Victoria, BC`}
+      aboutTitle={`${page.label} across ${CITY.region}`}
+      collectionName={`${page.label} in ${CITY.place}`}
       breadcrumbs={[
         { name: "Home", path: "/" },
         { name: "Sports", path: "/sports" },

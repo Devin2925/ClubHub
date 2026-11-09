@@ -1,4 +1,5 @@
 import { venueSlug } from "./utils";
+import { IS_VICTORIA } from "./city";
 
 export interface VenueClosure {
   venueName: string;
@@ -21,7 +22,7 @@ export interface VenueClosure {
 }
 
 // Venues that are closed upstream, so they have no events but are still searched for.
-export const VENUE_CLOSURES: VenueClosure[] = [
+const VICTORIA_CLOSURES: VenueClosure[] = [
   {
     venueName: "Crystal Pool and Fitness Centre",
     municipality: "Victoria",
@@ -55,6 +56,12 @@ export const VENUE_CLOSURES: VenueClosure[] = [
     ],
   },
 ];
+
+// ClubHub Vancouver: none yet. Vancouver Aquatic Centre (closed since 2026-06-28) is a
+// candidate once its reopening plan is confirmed on vancouver.ca.
+const VANCOUVER_CLOSURES: VenueClosure[] = [];
+
+export const VENUE_CLOSURES: VenueClosure[] = IS_VICTORIA ? VICTORIA_CLOSURES : VANCOUVER_CLOSURES;
 
 export function getVenueClosure(slug: string): VenueClosure | undefined {
   return VENUE_CLOSURES.find((closure) => venueSlug(closure.venueName) === slug);

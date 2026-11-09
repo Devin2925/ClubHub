@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { CITY } from "../lib/city";
 import CampsLanding, { campPageData } from "./CampsLanding";
 import { SITE_NAME } from "../lib/seo";
 
 export function generateMetadata(): Metadata {
+  if (!CITY.hasCamps) return {};
   const { all, summaries } = campPageData();
   const winter = summaries.find((row) => row.slug === "winter-break");
   const proD = summaries.find((row) => row.slug === "pro-d-days");
@@ -38,5 +41,7 @@ export function generateMetadata(): Metadata {
 export const revalidate = 3600;
 
 export default function CampsPage() {
+  // Victoria-only section (see camps/layout.tsx); don't render its copy elsewhere.
+  if (!CITY.hasCamps) notFound();
   return <CampsLanding />;
 }

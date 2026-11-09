@@ -1,3 +1,11 @@
+"""Write the frontend's data snapshot from a city's database.
+
+    ./venv/bin/python export_demo_snapshot.py                   # ClubHub Victoria -> frontend/data/demo-snapshot.json
+    ./venv/bin/python export_demo_snapshot.py --city vancouver  # ClubHub Vancouver -> frontend/data/vancouver-snapshot.json
+
+The frontend picks a snapshot by NEXT_PUBLIC_CITY at build time (frontend/next.config.ts).
+"""
+import argparse
 import json
 import os
 import sqlite3
@@ -9,17 +17,49 @@ from models import SessionLocal, SourceSyncStatus, VenueSyncStatus
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "clubhub.db")
-OUTPUT_PATH = os.path.join(os.path.dirname(BASE_DIR), "frontend", "data", "demo-snapshot.json")
+DATA_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "data")
+CITIES = {
+    "victoria": {"db": os.path.join(BASE_DIR, "clubhub.db"), "output": os.path.join(DATA_DIR, "demo-snapshot.json")},
+    "vancouver": {
+        "db": os.path.join(BASE_DIR, "clubhub_vancouver.db"),
+        "output": os.path.join(DATA_DIR, "vancouver-snapshot.json"),
+        # The site only shows a one-line note from each description; Vancouver's run long
+        # (11 MB in all), so cap them to keep the snapshot small.
+        "description_limit": 300,
+        # ActiveNet lists camps one row per day; Vancouver has no camps section yet.
+        "skip_offerings": ("camp",),
+    },
+}
+
+
+def _trim(text: str, limit: int) -> str:
+    if not text or len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0] + "…"
 
 
 def main():
-    conn = sqlite3.connect(DB_PATH)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--city", choices=sorted(CITIES), default="victoria")
+    args = parser.parse_args()
+    city = CITIES[args.city]
+    OUTPUT_PATH = city["output"]
+
+    conn = sqlite3.connect(city["db"])
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
     events = [dict(row) for row in cur.execute("SELECT * FROM events ORDER BY start_time ASC")]
-    db = SessionLocal()
+    if args.city == "vancouver":
+        from vancouver_db import VancouverSessionLocal as session_factory
+        events = [
+            {**event, "description": _trim(event["description"] or "", city["description_limit"])}
+            for event in events
+            if event["offering_type"] not in city["skip_offerings"]
+        ]
+    else:
+        session_factory = SessionLocal
+    db = session_factory()
     try:
         source_models = (
             db.query(SourceSyncStatus)
@@ -61,7 +101,7 @@ def main():
         "source_alerts": source_alerts,
         "venue_alerts": venue_alerts,
         "events": events,
-        "camp_sources": CAMP_SOURCES,
+        "camp_sources": CAMP_SOURCES if args.city == "victoria" else [],
         "sources": source_rows,
         "venues": venue_rows,
     }
