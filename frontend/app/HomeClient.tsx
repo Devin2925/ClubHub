@@ -48,6 +48,11 @@ export interface StatusData {
   };
 }
 
+interface SavedPlace {
+  municipality: string;
+  venue: string;
+}
+
 // Show this many rec centres before "+ N more places" (City of Vancouver has dozens).
 const VISIBLE_PLACES = 12;
 
@@ -107,6 +112,10 @@ export default function HomeClient({
   const [activeMunicipality, setActiveMunicipality] = useState(linkedMunicipality);
   const [activeVenue, setActiveVenue] = useState(initialQuery.venue || "");
   const [showAllPlaces, setShowAllPlaces] = useState(false);
+  // The rec centre this device last picked ("Your rec centre"); it reopens on the next visit.
+  const [savedPlace, setSavedPlace] = useState<SavedPlace | null>(null);
+  // Once a rec centre is chosen the picker folds into a one-line card until "Change".
+  const [pickerOpen, setPickerOpen] = useState(false);
   // null = default to today (or the next day with activities); "" = All Dates
   const [dateSelection, setDateSelection] = useState<string | null>(initialQuery.date ?? null);
   const [activeSport, setActiveSport] = useState(initialQuery.sport || "");
@@ -136,21 +145,24 @@ export default function HomeClient({
       .catch((error) => console.error("Failed to load schedules", error))
       .finally(() => setLoading(false));
 
-    // Reopen on the rec centre this visitor last looked at, unless the link says otherwise.
-    const linkHasFilters = Object.values(initialQuery).some((value) => value !== undefined && value !== null);
-    if (!linkHasFilters) {
-      try {
-        const saved = JSON.parse(window.localStorage.getItem(REMEMBERED_PLACE_KEY) || "null");
-        const known = catalog.some(
-          (place) => place.municipality === saved?.municipality && (!saved?.venue || place.venue === saved.venue)
+    // Reopen on this visitor's rec centre, unless the link asks for something else.
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(REMEMBERED_PLACE_KEY) || "null") as SavedPlace | null;
+      const known =
+        saved &&
+        catalog.some(
+          (place) => place.municipality === saved.municipality && (!saved.venue || place.venue === saved.venue)
         );
-        if (saved && known) {
+      if (saved && known) {
+        if (saved.venue) setSavedPlace(saved);
+        const linkHasFilters = Object.values(initialQuery).some((value) => value !== undefined && value !== null);
+        if (!linkHasFilters) {
           setActiveMunicipality(saved.municipality);
           setActiveVenue(saved.venue || "");
         }
-      } catch {
-        // Storage can be blocked (private browsing); the default view still works.
       }
+    } catch {
+      // Storage can be blocked (private browsing); the default view still works.
     }
 
     // Sessions drop off as they finish while the page stays open.
@@ -160,10 +172,11 @@ export default function HomeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function rememberPlace(municipality: string, venue: string) {
+  function rememberPlace(place: SavedPlace | null) {
+    setSavedPlace(place);
     try {
-      if (municipality) {
-        window.localStorage.setItem(REMEMBERED_PLACE_KEY, JSON.stringify({ municipality, venue }));
+      if (place) {
+        window.localStorage.setItem(REMEMBERED_PLACE_KEY, JSON.stringify(place));
       } else {
         window.localStorage.removeItem(REMEMBERED_PLACE_KEY);
       }
@@ -172,20 +185,37 @@ export default function HomeClient({
     }
   }
 
+  // Browsing municipalities doesn't change the saved rec centre; picking a rec centre does.
   function selectMunicipality(municipality: string) {
     setActiveMunicipality(municipality);
     setActiveVenue("");
     setShowAllPlaces(false);
     setDateSelection(null);
     setActiveSport("");
-    rememberPlace(municipality, "");
   }
 
   function selectVenue(venue: string) {
     setActiveVenue(venue);
     setDateSelection(null);
     setActiveSport("");
-    rememberPlace(activeMunicipality, venue);
+    if (venue) {
+      rememberPlace({ municipality: activeMunicipality, venue });
+      setPickerOpen(false);
+    }
+  }
+
+  function openSavedPlace() {
+    if (!savedPlace) return;
+    setActiveMunicipality(savedPlace.municipality);
+    setActiveVenue(savedPlace.venue);
+    setDateSelection(null);
+    setActiveSport("");
+    setPickerOpen(false);
+  }
+
+  function openPicker() {
+    setShowAllPlaces(false);
+    setPickerOpen(true);
   }
 
   function selectDate(date: string) {
@@ -293,6 +323,10 @@ export default function HomeClient({
   const placesExpanded = showAllPlaces || activePlaceHidden;
   const shownRecCentres = placesExpanded ? recCentres : recCentres.slice(0, VISIBLE_PLACES);
   const hiddenPlaceCount = placesExpanded ? 0 : recCentres.length - shownRecCentres.length + otherPlaces.length;
+  const isSavedPlace = Boolean(
+    savedPlace && activeVenue && savedPlace.venue === activeVenue && savedPlace.municipality === activeMunicipality
+  );
+  const placeCollapsed = activeVenue !== "" && !pickerOpen;
   const placeDayLabel = activeDate ? dayChipLabel(activeDate, todayKey).toLowerCase() : "upcoming";
 
   function placeTile(place: CatalogVenue) {
@@ -302,7 +336,7 @@ export default function HomeClient({
       <button
         key={place.venue}
         className={`venue-tile ${active ? "active" : ""} ${count === 0 ? "venue-tile-quiet" : ""}`}
-        onClick={() => selectVenue(active ? "" : place.venue)}
+        onClick={() => (active ? setPickerOpen(false) : selectVenue(place.venue))}
         aria-pressed={active}
         title={count === null ? place.venue : `${place.venue}: ${count} ${placeDayLabel}`}
         type="button"
@@ -390,77 +424,105 @@ export default function HomeClient({
         </section>
 
         <section className="simple-filter-panel">
-          <div className="simple-municipality-row">
-            <div className="chip-group-label">Municipality</div>
-            <div className="municipality-picker">
-              <button
-                className={`municipality-pill ${activeMunicipality === "" ? "active" : ""}`}
-                onClick={() => selectMunicipality("")}
-                type="button"
-              >
-                All Municipalities
-              </button>
-              {municipalities.map((municipality) => (
-                <button
-                  key={municipality}
-                  className={`municipality-pill ${activeMunicipality === municipality ? "active" : ""}`}
-                  onClick={() => selectMunicipality(municipality)}
-                  type="button"
-                >
-                  {municipality}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="simple-venue-row">
-            <div className="chip-group-label" id="venue-picker-label">
-              {activeMunicipality ? `Rec centres in ${activeMunicipality}` : "Rec Centre"}
-            </div>
-            {activeMunicipality ? (
-              <div className="venue-picker" role="group" aria-labelledby="venue-picker-label">
-                <button
-                  className={`venue-tile venue-tile-all ${activeVenue === "" ? "active" : ""}`}
-                  onClick={() => selectVenue("")}
-                  aria-pressed={activeVenue === ""}
-                  type="button"
-                >
-                  <span className="venue-tile-name">All of {activeMunicipality}</span>
-                </button>
-                {shownRecCentres.map(placeTile)}
-                {placesExpanded && otherPlaces.length ? (
-                  <>
-                    <span className="venue-picker-sub">Other places · one-off events and camps</span>
-                    {otherPlaces.map(placeTile)}
-                  </>
-                ) : null}
-                {hiddenPlaceCount > 0 ? (
-                  <button className="venue-tile venue-tile-more" onClick={() => setShowAllPlaces(true)} type="button">
-                    <span className="venue-tile-name">
-                      + {hiddenPlaceCount} more {hiddenPlaceCount === 1 ? "place" : "places"}
-                    </span>
-                  </button>
-                ) : null}
+          {placeCollapsed ? (
+            <div className="place-card">
+              <div className="place-card-text">
+                <div className="chip-group-label">{isSavedPlace ? "Your rec centre" : "Rec centre"}</div>
+                <div className="place-card-name">{activeVenue}</div>
+                <div className="place-card-meta">
+                  {activeMunicipality}
+                  {isSavedPlace ? " · opens here next time" : ""}
+                </div>
               </div>
-            ) : (
-              <p className="venue-picker-hint">
-                Pick a municipality above to see its rec centres, or browse{" "}
-                <Link className="inline-link" href="/venues">
-                  {HERO_COPY.allVenues.replace(/^All\b/, "all")}
-                </Link>
-                .
-              </p>
-            )}
-          </div>
+              <button className="place-card-change" onClick={openPicker} aria-expanded={false} type="button">
+                Change
+              </button>
+            </div>
+          ) : (
+            <>
+              {savedPlace && !isSavedPlace ? (
+                <div className="saved-place-row">
+                  <button className="saved-place-return" onClick={openSavedPlace} type="button">
+                    ← Back to your rec centre: <strong>{savedPlace.venue}</strong>
+                  </button>
+                  <button className="saved-place-forget" onClick={() => rememberPlace(null)} type="button">
+                    Forget
+                  </button>
+                </div>
+              ) : null}
+              <div className="simple-municipality-row">
+                <div className="chip-group-label">Municipality</div>
+                <div className="municipality-picker">
+                  <button
+                    className={`municipality-pill ${activeMunicipality === "" ? "active" : ""}`}
+                    onClick={() => selectMunicipality("")}
+                    type="button"
+                  >
+                    All Municipalities
+                  </button>
+                  {municipalities.map((municipality) => (
+                    <button
+                      key={municipality}
+                      className={`municipality-pill ${activeMunicipality === municipality ? "active" : ""}`}
+                      onClick={() => selectMunicipality(municipality)}
+                      type="button"
+                    >
+                      {municipality}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {municipalityClosures.map((closure) => (
-            <p key={closure.venueName} className="closure-inline-note">
-              <strong>{closure.venueName}</strong> is {closureHeadline(closure).toLowerCase()}.{" "}
-              <a className="inline-link" href={`/venues/${venueSlug(closure.venueName)}`}>
-                Details
-              </a>
-            </p>
-          ))}
+              <div className="simple-venue-row">
+                <div className="chip-group-label" id="venue-picker-label">
+                  {activeMunicipality ? `Rec centres in ${activeMunicipality}` : "Rec Centre"}
+                </div>
+                {activeMunicipality ? (
+                  <div className="venue-picker" role="group" aria-labelledby="venue-picker-label">
+                    <button
+                      className={`venue-tile venue-tile-all ${activeVenue === "" ? "active" : ""}`}
+                      onClick={() => selectVenue("")}
+                      aria-pressed={activeVenue === ""}
+                      type="button"
+                    >
+                      <span className="venue-tile-name">All of {activeMunicipality}</span>
+                    </button>
+                    {shownRecCentres.map(placeTile)}
+                    {placesExpanded && otherPlaces.length ? (
+                      <>
+                        <span className="venue-picker-sub">Other places · one-off events and camps</span>
+                        {otherPlaces.map(placeTile)}
+                      </>
+                    ) : null}
+                    {hiddenPlaceCount > 0 ? (
+                      <button className="venue-tile venue-tile-more" onClick={() => setShowAllPlaces(true)} type="button">
+                        <span className="venue-tile-name">
+                          + {hiddenPlaceCount} more {hiddenPlaceCount === 1 ? "place" : "places"}
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="venue-picker-hint">
+                    Pick a municipality above to see its rec centres, or browse{" "}
+                    <Link className="inline-link" href="/venues">
+                      {HERO_COPY.allVenues.replace(/^All\b/, "all")}
+                    </Link>
+                    .
+                  </p>
+                )}
+              </div>
+
+              {municipalityClosures.map((closure) => (
+                <p key={closure.venueName} className="closure-inline-note">
+                  <strong>{closure.venueName}</strong> is {closureHeadline(closure).toLowerCase()}.{" "}
+                  <a className="inline-link" href={`/venues/${venueSlug(closure.venueName)}`}>
+                    Details
+                  </a>
+                </p>
+              ))}
+            </>
+          )}
 
           <div className="simple-date-row">
             <div className="chip-group-label">Dates</div>

@@ -283,11 +283,19 @@ button {
   transition: all var(--transition-fast);
 }
 
-.municipality-pill:hover,
 .municipality-pill.active {
   color: var(--text-primary);
   border-color: var(--text-primary);
   background: linear-gradient(180deg, #232323 0%, #181818 100%);
+}
+
+/* Hover only where there's a mouse: on phones :hover sticks to the last-tapped spot. */
+@media (hover: hover) {
+  .municipality-pill:hover {
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+    background: linear-gradient(180deg, #232323 0%, #181818 100%);
+  }
 }
 
 .simple-filter-grid {
@@ -342,10 +350,12 @@ button {
   transition: all var(--transition-fast);
 }
 
-.venue-tile:hover {
-  color: var(--text-primary);
-  border-color: var(--border-color-hover);
-  background: var(--bg-card-hover);
+@media (hover: hover) {
+  .venue-tile:hover {
+    color: var(--text-primary);
+    border-color: var(--border-color-hover);
+    background: var(--bg-card-hover);
+  }
 }
 
 .venue-tile.active {
@@ -399,6 +409,110 @@ button {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text-secondary);
+}
+
+/* The picker folded up once a rec centre is chosen: "Your rec centre: X · Change". */
+.place-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color-hover);
+  border-left: 3px solid var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.place-card-text {
+  min-width: 0;
+}
+
+.place-card-text .chip-group-label {
+  margin-bottom: 0.2rem;
+}
+
+.place-card-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.place-card-meta {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.place-card-change {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--text-primary);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.place-card-change:focus-visible {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+@media (hover: hover) {
+  .place-card-change:hover {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+  }
+}
+
+/* Shown while browsing elsewhere: one tap back to the saved rec centre. */
+.saved-place-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.saved-place-return,
+.saved-place-forget {
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border-color-hover);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.saved-place-return {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-place-return strong {
+  color: var(--text-primary);
+}
+
+@media (hover: hover) {
+  .saved-place-return:hover,
+  .saved-place-forget:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+  }
+}
+
+.saved-place-forget {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
 .full-width-scroller {
@@ -1321,6 +1435,20 @@ button {
   }
   .venue-picker-sub {
     grid-column: 1 / -1;
+  }
+  .place-card {
+    margin-bottom: 0.85rem;
+    padding: 0.7rem 0.8rem;
+  }
+  .place-card-name {
+    font-size: 0.98rem;
+  }
+  .saved-place-row {
+    margin-bottom: 0.85rem;
+  }
+  .saved-place-return,
+  .saved-place-forget {
+    font-size: 0.8rem;
   }
   .municipality-pill,
   .chip {
