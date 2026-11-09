@@ -153,7 +153,9 @@ REPO="$(git remote get-url origin | sed -E 's#(git@github.com:|https://github.co
 EXPECTED="$("$PYTHON_BIN" -c "import json; print(json.load(open('$SNAPSHOT'))['generated_at'][:16])")"
 DEPLOY=""
 for _ in $(seq 1 40); do
-  DEPLOY="$(gh api "repos/$REPO/commits/$SHA/status" --jq '.statuses[] | select(.context == "Vercel") | .state' 2>/dev/null | head -1 || true)"
+  # Victoria's Vercel project is "frontend". Match on its URL, not the status name, which
+  # becomes "Vercel – <project>" once a second (Vancouver) project deploys the same repo.
+  DEPLOY="$(gh api "repos/$REPO/commits/$SHA/status" --jq '.statuses[] | select((.context | startswith("Vercel")) and (.target_url // "" | contains("/frontend/"))) | .state' 2>/dev/null | head -1 || true)"
   [[ "$DEPLOY" == "success" || "$DEPLOY" == "failure" || "$DEPLOY" == "error" ]] && break
   sleep 15
 done
