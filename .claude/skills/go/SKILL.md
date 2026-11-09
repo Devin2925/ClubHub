@@ -103,7 +103,7 @@ Then decide which case it is:
 - **FAILED or thin `surrey_dropin`:** it discovers the term PDFs on surrey.ca/dropin by
   name and reads the term dates from each PDF, so new terms flow in. A FAILED or halved count
   usually means the PDF layout changed; `surrey_grid.py` reads word positions (venue heading
-  above each PROGRAM..SUNDAY grid). It reads Gym, Youth, Seniors and Arena, not Aquatics.
+  above each PROGRAM..SUNDAY grid). It reads Gym, Youth, Seniors, Arena and Aquatics (aquatics facility-hours rows are filtered out).
 - **FAILED `sfu_recreation`:** its page heading must still read like "FALL 2026 (Sept 14 - Dec 4)".
   Between terms it legitimately drops to 0 (add it to `KNOWN_NOISE` then). Update
   `SFU_CLOSED` in `vancouver_sfu.py` with each term's university holidays.

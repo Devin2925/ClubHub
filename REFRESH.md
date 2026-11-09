@@ -126,7 +126,7 @@ It scrapes the 16 Metro Vancouver sources into `backend/clubhub_vancouver.db`:
 - SFU Recreation (`scrapers/vancouver_sfu.py`), whose weekly drop-in table repeats
   until the term ends
 - City of Surrey (`scrapers/vancouver_surrey.py` + `scrapers/surrey_grid.py`), read from
-  the weekday-grid PDFs on surrey.ca/dropin (Gym, Youth, Seniors, Arena)
+  the weekday-grid PDFs on surrey.ca/dropin (Gym, Youth, Seniors, Arena, Aquatics)
 
 Then it runs the same `refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
 `backend/vancouver_registry.py`. If everything is OK it exports

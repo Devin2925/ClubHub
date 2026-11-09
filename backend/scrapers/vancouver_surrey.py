@@ -5,8 +5,8 @@ Seniors and Arena. Each PDF has, per facility, a "PROGRAM MONDAY ... SUNDAY" gri
 repeats weekly between the term dates. surrey_grid.read_surrey_grid() reads them by word
 position; this scraper discovers the current PDFs, reads them and saves the sessions.
 
-Not read yet: the Aquatics PDF (its grid mixes facility opening hours with drop-in swims)
-and the monthly Fitness calendar. Add them once their rows can be told apart from hours.
+The Aquatics PDF's facility-hours rows (hot tub, sauna, fitness centre, waterslide, diving
+boards) are filtered out; its swims are kept. Not read yet: the monthly Fitness calendar.
 
 The PDF links on /dropin carry the term in their name (FALL-2026-Gym-Drop-in-Schedule.pdf),
 so a new term is picked up without code changes; the grid reader takes the dates from the
@@ -23,7 +23,14 @@ DROP_IN_PAGE = "https://www.surrey.ca/dropin"
 BASE = "https://www.surrey.ca"
 # Activity-type PDFs this scraper reads (filename keyword → not used for filtering, just which
 # links to follow). The Aquatics and Fitness PDFs are left out on purpose (see module docstring).
-PDF_KINDS = ("Gym", "Youth", "Seniors", "Arena")
+PDF_KINDS = ("Gym", "Youth", "Seniors", "Arena", "Aquatics")
+
+# Aquatics PDF rows that are facility features or hours, not a drop-in activity.
+NOT_AN_ACTIVITY = re.compile(
+    r"fitness (centre|facility)|wellness|hot ?tub|sauna|steam room|water ?slide|diving board|"
+    r"platform|gymnasium|limited|lane usage|^\*",
+    re.I,
+)
 PDF_LINK = re.compile(r'href="(/sites/default/files/[^"]+?-(%s)-Drop-in-Schedule\.pdf)"' % "|".join(PDF_KINDS), re.I)
 
 SURREY_SOURCES = {
@@ -70,8 +77,10 @@ class SurreyDropInScraper(VancouverScraper):
     def _keep_sessions(self, item, url: str) -> None:
         venue = clean_venue(item.venue)
         venue = VENUE_FIXES.get(venue, venue)
-        title = re.sub(r"\s+", " ", item.program).strip()
+        title = re.sub(r"\s+", " ", item.program).strip().rstrip("*•").strip()
         if "PROGRAM" in title.upper() or len(title) < 3:  # a header word that leaked into a cell
+            return
+        if NOT_AN_ACTIVITY.search(title):  # pool facility hours, not a drop-in
             return
         for day in item.dates:
             try:
