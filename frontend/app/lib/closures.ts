@@ -57,9 +57,33 @@ const VICTORIA_CLOSURES: VenueClosure[] = [
   },
 ];
 
-// ClubHub Vancouver: none yet. Vancouver Aquatic Centre (closed since 2026-06-28) is a
-// candidate once its reopening plan is confirmed on vancouver.ca.
-const VANCOUVER_CLOSURES: VenueClosure[] = [];
+// Sources (checked 2026-11-09): City of Vancouver news release "Vancouver Aquatic Centre
+// scheduled to close June 28, 2026" and Daily Hive, Oct. 14, 2026 (replacement design and the
+// court pause on demolition). Recheck after the Nov. 3, 2026 injunction date.
+const VANCOUVER_CLOSURES: VenueClosure[] = [
+  {
+    venueName: "Vancouver Aquatic Centre",
+    municipality: "Vancouver",
+    closedOn: "June 28, 2026",
+    reopensLabel: "its replacement opens (targeted for 2029)",
+    summary:
+      "The Vancouver Aquatic Centre on Beach Avenue closed permanently on June 28, 2026 ahead of demolition. A new aquatic centre with an eight-lane 25m lap pool, leisure and diving pools, a hot tub and a fitness gym is planned for the same site, targeted to open in 2029.",
+    infoUrl: "https://vancouver.ca/parks-recreation-culture/vancouver-aquatic-centre.aspx",
+    nearby: [
+      {
+        sport: "swimming",
+        heading: "Where to swim while the Vancouver Aquatic Centre is closed",
+        venues: [
+          "Templeton Park Pool",
+          "Hillcrest Aquatic Centre",
+          "Lord Byng Pool",
+          "Kerrisdale Pool",
+          "Kensington Pool",
+        ],
+      },
+    ],
+  },
+];
 
 export const VENUE_CLOSURES: VenueClosure[] = IS_VICTORIA ? VICTORIA_CLOSURES : VANCOUVER_CLOSURES;
 

@@ -336,7 +336,7 @@ VANCOUVER_REGISTRY = [
         priority='high',
         sports=['swimming'],
         refresh_group='vancouver_discovery',
-        notes='202 sessions over 36 days on 1 calendar(s) (Public Swimming), checked 2026-11-09. News reports in 2026 said Kerrisdale Pool had been closed for most of a year; confirm the calendar sessions are real before publishing.',
+        notes='Reopened Sept. 1, 2026 after a roof project and drain/expansion-joint repairs that kept it closed most of the year (Park Board memo, Aug. 11, 2026). About 200 public swim sessions on the Public Swimming calendar, checked 2026-11-09.',
     ),
     venue(
         'Vancouver',
@@ -630,7 +630,7 @@ VANCOUVER_REGISTRY = [
         priority='low',
         sports=['swimming'],
         refresh_group='vancouver_discovery',
-        notes="Closed permanently 2026-06-28 ahead of demolition (court appeal paused demolition into November). Add a closure notice like Crystal Pool's.",
+        notes="Closed permanently 2026-06-28 ahead of demolition (court appeal paused demolition into November). Replacement targeted for 2029. Closure notice in frontend/app/lib/closures.ts (VANCOUVER_CLOSURES).",
     ),
     # --- Burnaby ---
     venue(

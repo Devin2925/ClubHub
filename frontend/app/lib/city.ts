@@ -47,8 +47,7 @@ export const CITIES: Record<CityKey, CityConfig> = {
     region: "Metro Vancouver",
     searchTerm: "vancouver",
     hasCamps: false,
-    // Devin hasn't picked Vancouver's contact yet.
-    contactPhone: null,
+    contactPhone: { display: "203-979-3744", tel: "+12039793744", schema: "+1-203-979-3744" },
   },
 };
 

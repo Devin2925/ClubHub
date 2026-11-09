@@ -104,6 +104,29 @@ _TIME = r"\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?\s*-\s*\d{1,2}(?::\d{2})?\s*[ap]\
 WHEN_SUFFIX = re.compile(rf"(?:(?:\s+|\s*[-,]\s*)(?:{_DAY}|{_TIME}))+$", re.I)
 SMALL_WORDS = {"a", "an", "and", "or", "of", "the", "to", "in", "on", "at", "for", "with", "w/"}
 STICK_AND_PUCK = re.compile(r"\bstick\b[\s,&and]*\bpuck\b", re.I)
+
+# Titles base.py files under "other" that clearly belong to a sport the site shows, checked in
+# order (a kids' dance class is kids, not arts). Card games, youth lounges, open gyms and
+# seniors' socials stay "other" (shown as Community).
+TITLE_SPORT = [
+    (re.compile(r"shoot\s*(?:&|and|n)\s*score|ringette", re.I), "hockey"),
+    (re.compile(
+        r"\bkids?\b|zumbini|sportball|roaming rascals|\btots?\b|toddler|preschool|early years|kindergym|"
+        r"little ballerinas|\bmini\b|playgroup|playtime|stay\s*(?:&|and)\s*play|gymnastic|parent\s*(?:&|and)\s*(?:child|baby)",
+        re.I,
+    ), "kids"),
+    (re.compile(r"racquet sport", re.I), "badminton"),
+    (re.compile(
+        r"boxing|walking|exercise|\bzumba\b|tai\s*chi|qi\s*gong|qigong|luk tung kuen|pilates|boot\s*camp|strength|stretch|"
+        r"capoeira|karate|kung\s*fu|taekwondo|martial art|judo|fencing",
+        re.I,
+    ), "fitness"),
+    (re.compile(
+        r"danc|ballet|ballroom|hip\s*hop|bhangra|k-?pop|salsa|tango|pottery|\bclay\b|ceramic|sewing|woodshop|"
+        r"woodwork|painting|drawing|watercolou?r|\bart\b|\barts\b|choir|ukulele|knit|quilt|craft",
+        re.I,
+    ), "arts"),
+]
 CLASS_IN_POOL_OR_RINK = re.compile(r"aqua\s*fit|aquafit|\bfit\b|fitness|\blearn\s+to\b", re.I)
 
 # Sport to use when the title alone doesn't say ("Multi-Use" on the swim calendar).
@@ -157,8 +180,10 @@ def classify(title: str, facility_name: str, description: str, calendar_label: s
     overrides = {}
     sport = classify_sport_fields(title, facility_name)
     if sport == "other":
+        sport = next((value for pattern, value in TITLE_SPORT if pattern.search(title)), sport)
+    if sport == "other":
         sport = next((value for pattern, value in CALENDAR_SPORT if pattern.search(calendar_label)), sport)
-    if STICK_AND_PUCK.search(title):
+    if STICK_AND_PUCK.search(title) or TITLE_SPORT[0][0].search(title):
         # "Stick, Puck & Ring" misses base.py's "stick & puck" pattern.
         sport = "hockey"
         overrides["offering_override"] = "pickup"
