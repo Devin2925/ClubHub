@@ -25,7 +25,13 @@ export const OFFERING_META: Record<string, { label: string }> = {
   pickup: { label: "Pickup" },
   class: { label: "Class" },
   camp: { label: "Camp" },
+  event: { label: "Event" },
 };
+
+// Community calendars store all-day events as 00:00-23:59.
+export function isAllDay(event: Pick<EventData, "start_time" | "end_time">): boolean {
+  return /[ T]00:00/.test(event.start_time) && /[ T]23:59/.test(event.end_time || "");
+}
 
 export function getSportMeta(sportType: string) {
   return SPORT_META[sportType] || SPORT_META.other;
@@ -242,4 +248,7 @@ export interface EventData {
   end_date?: string;
   availability?: string;
   ages?: string;
+  // Community events that run several days are listed on each day; this keeps
+  // the first day so the card can still say "Dec 1 – Dec 14".
+  run_start?: string;
 }

@@ -11,6 +11,7 @@ import {
   toScheduleIso,
   getOfferingMeta,
   getSportMeta,
+  isAllDay,
   venueSlug,
 } from "../lib/utils";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
@@ -38,10 +39,13 @@ export default function EventCard({
 
   const timeString = formatTime(event.start_time);
   const [timeVal, amPm] = timeString.split(" ");
+  const allDay = isAllDay(event);
+  // Community events (concerts, markets, ceremonies) link to their listing, not a booking.
+  const communityEvent = event.offering_type === "event";
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SportsEvent",
+    "@type": communityEvent ? "Event" : "SportsEvent",
     name: event.title,
     startDate: toScheduleIso(event.start_time),
     endDate: toScheduleIso(event.end_time),
@@ -85,10 +89,16 @@ export default function EventCard({
 
       <div className={`event-card${happeningNow ? " event-card-live" : ""}`}>
         <div className="event-time">
-          <div className="event-time-start">
-            {timeVal} <span className="event-time-am">{amPm}</span>
-          </div>
-          <div className="event-time-end">to {formatTime(event.end_time)}</div>
+          {allDay ? (
+            <div className="event-time-start">All day</div>
+          ) : (
+            <>
+              <div className="event-time-start">
+                {timeVal} <span className="event-time-am">{amPm}</span>
+              </div>
+              <div className="event-time-end">to {formatTime(event.end_time)}</div>
+            </>
+          )}
         </div>
 
         <div className="event-info">
@@ -98,7 +108,9 @@ export default function EventCard({
           </div>
           {event.end_date || event.ages || event.availability ? (
             <div className="event-camp-line">
-              {event.end_date ? <span>{formatDateRange(event.start_time, event.end_date)}</span> : null}
+              {event.end_date ? (
+                <span>{formatDateRange(event.run_start || event.start_time, event.end_date)}</span>
+              ) : null}
               {event.ages ? <span>{formatAges(event.ages)}</span> : null}
               {event.availability ? (
                 <span className={/full/i.test(event.availability) ? "camp-spots camp-spots-full" : "camp-spots"}>
@@ -152,7 +164,7 @@ export default function EventCard({
               className="event-book-link"
               onClick={(e) => e.stopPropagation()}
             >
-              Book
+              {communityEvent ? "Details" : "Book"}
             </a>
           ) : null}
         </div>

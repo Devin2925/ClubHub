@@ -15,10 +15,45 @@ export function getDemoSnapshot(): DemoSnapshot {
   return snapshot as unknown as DemoSnapshot;
 }
 
+// A community event that runs several days (a market weekend, a month-long
+// exhibition) is stored once with an end_date; list it on each of its days at
+// the same hours. Camps stay single rows - a weekly course doesn't meet daily.
+// Copies get negative ids so React keys stay unique.
+function expandMultiDayEvents(events: EventData[]): EventData[] {
+  const expanded: EventData[] = [];
+  for (const event of events) {
+    const firstDay = getDateKey(event.start_time);
+    if (event.offering_type !== "event" || !event.end_date || event.end_date <= firstDay) {
+      expanded.push(event);
+      continue;
+    }
+    const startClock = event.start_time.replace("T", " ").slice(11);
+    const endClock = (event.end_time || event.start_time).replace("T", " ").slice(11);
+    const day = new Date(`${firstDay}T00:00:00Z`);
+    for (let offset = 0; offset < 120; offset += 1) {
+      const key = day.toISOString().slice(0, 10);
+      if (key > event.end_date) break;
+      expanded.push(
+        offset === 0
+          ? { ...event, run_start: event.start_time }
+          : {
+              ...event,
+              id: -(event.id * 1000 + offset),
+              start_time: `${key} ${startClock}`,
+              end_time: `${key} ${endClock}`,
+              run_start: event.start_time,
+            }
+      );
+      day.setUTCDate(day.getUTCDate() + 1);
+    }
+  }
+  return expanded;
+}
+
 // The snapshot is frozen at export time, so hide anything that has already finished.
 export function getDemoEvents(): EventData[] {
   const todayKey = getTodayKey();
-  return (getDemoSnapshot().events || []).filter(
+  return expandMultiDayEvents(getDemoSnapshot().events || []).filter(
     (event) => getDateKey(event.end_time || event.start_time) >= todayKey
   );
 }

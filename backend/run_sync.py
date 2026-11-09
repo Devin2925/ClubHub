@@ -18,6 +18,9 @@ from scrapers.oakbay_fitness import OakBayFitnessScraper
 from scrapers.oakbay_group_fitness_pdf import OakBayGroupFitnessPDFScraper
 from scrapers.oakbay_pdf import OakBayPDFScraper
 from scrapers.oakbay_arena_pdf import OakBayArenaPDFScraper
+from scrapers.oakbay_events import OakBayEventsScraper
+from scrapers.esquimalt_events import EsquimaltEventsScraper
+from scrapers.saanich_events import SaanichEventsScraper
 from scrapers.oakbay_aquatics_pdf import OakBayAquaticsPDFScraper
 from scrapers.pearkes_pdf import PearkesPDFScraper
 from scrapers.saanich_commonwealth_swimming_pdf import SaanichCommonwealthSwimmingPDFScraper
@@ -301,6 +304,7 @@ def iter_scrapers():
     yield ("oakbay_aquatics_pdf", "Oak Bay Aquatics PDF", "Oak Bay", OakBayAquaticsPDFScraper())
     yield ("oakbay_arena_pdf", "Oak Bay Arena PDF", "Oak Bay", OakBayArenaPDFScraper())
     yield ("oakbay_group_fitness_pdf", "Oak Bay Group Fitness PDF", "Oak Bay", OakBayGroupFitnessPDFScraper())
+    yield ("oakbay_events", "Oak Bay Community Events Calendar", "Oak Bay", OakBayEventsScraper())
     yield (
         "oaklands_recdesk",
         "Oaklands Community Centre",
@@ -372,6 +376,8 @@ def iter_scrapers():
     yield ("west_shore_public", "West Shore Parks & Recreation", "West Shore", WSPRScraper())
     yield ("west_shore_camps", "West Shore Parks & Recreation Camps", "West Shore", WSPRCampsScraper())
     yield ("saanich_camps", "Saanich Day Camps", "Saanich", SaanichCampsScraper())
+    yield ("saanich_events", "Saanich Community Events", "Saanich", SaanichEventsScraper())
+    yield ("esquimalt_events", "Esquimalt Community Events Calendar", "Esquimalt", EsquimaltEventsScraper())
     for site in CAMP_SITES:
         yield (
             f"perfectmind_camps_{site['subdomain']}",

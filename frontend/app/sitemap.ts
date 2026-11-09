@@ -14,10 +14,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const eventRows = snapshot.events || [];
   const venueSet = new Set<string>();
 
-  // Venues that only appear as a camp location (a school gym, a stable) have no
-  // schedule worth a page of their own; their camps are on /camps.
+  // Venues that only appear as a camp location (a school gym, a stable) or a
+  // one-off community event spot (a cenotaph) have no schedule worth a page of
+  // their own; camps are on /camps and events show on their dates.
   for (const event of eventRows) {
-    if (event.venue_name && event.offering_type !== "camp") {
+    if (event.venue_name && event.offering_type !== "camp" && event.offering_type !== "event") {
       venueSet.add(venueSlug(event.venue_name));
     }
   }
