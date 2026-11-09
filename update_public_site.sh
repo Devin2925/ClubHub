@@ -65,7 +65,7 @@ fi
 # --- 2. Scrape -------------------------------------------------------------------
 START_UTC="$(date -u '+%Y-%m-%d %H:%M:%S')"
 if [[ "$RUN_SYNC" == true ]]; then
-  section "Scraping (${SYNC_ARGS[*]+${SYNC_ARGS[*]}})"
+  if [[ ${#SYNC_ARGS[@]} -gt 0 ]]; then section "Scraping (${SYNC_ARGS[*]})"; else section "Scraping all sources"; fi
   (cd "$BACKEND_DIR" && PYTHONUNBUFFERED=1 "$PYTHON_BIN" run_sync.py ${SYNC_ARGS[@]+"${SYNC_ARGS[@]}"}) 2>&1 | tee -a "$LOG"
 else
   section "Skipping scrape"
@@ -144,14 +144,33 @@ echo "Pushed $(git rev-parse --short HEAD); Vercel deploys main." | tee -a "$LOG
 
 # --- 6. Confirm live -------------------------------------------------------------
 section "Waiting for the live site"
-# The sitemap's lastmod is the snapshot's generated_at, so it changes on deploy.
+# Vercel reports each deploy back to GitHub as a commit status; that's the
+# authoritative "it's live". The sitemap check is a second look: its lastmod is the
+# snapshot's generated_at. Vercel's firewall sometimes challenges scripted requests
+# (403 + x-vercel-mitigated), so a blocked sitemap isn't treated as a failed deploy.
+SHA="$(git rev-parse HEAD)"
+REPO="$(git remote get-url origin | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
 EXPECTED="$("$PYTHON_BIN" -c "import json; print(json.load(open('$SNAPSHOT'))['generated_at'][:16])")"
+DEPLOY=""
 for _ in $(seq 1 40); do
-  if curl -s "$SITE_URL/sitemap.xml" | grep -q "$EXPECTED"; then
-    echo "Live: $SITE_URL serves the snapshot generated $EXPECTED UTC." | tee -a "$LOG"
-    exit 0
-  fi
+  DEPLOY="$(gh api "repos/$REPO/commits/$SHA/status" --jq '.statuses[] | select(.context == "Vercel") | .state' 2>/dev/null | head -1 || true)"
+  [[ "$DEPLOY" == "success" || "$DEPLOY" == "failure" || "$DEPLOY" == "error" ]] && break
   sleep 15
 done
-echo "Pushed, but $SITE_URL didn't show the new snapshot within 10 minutes. Check Vercel." | tee -a "$LOG"
-exit 1
+case "$DEPLOY" in
+  success) echo "Vercel deployed $(git rev-parse --short HEAD)." | tee -a "$LOG" ;;
+  failure|error) echo "Vercel deploy of $(git rev-parse --short HEAD) FAILED - check the Vercel dashboard." | tee -a "$LOG"; exit 1 ;;
+  *) echo "Couldn't read the Vercel deploy status from GitHub (gh missing/not logged in, or still building)." | tee -a "$LOG" ;;
+esac
+
+HEADERS="$(curl -s -D - -o "$PARKED.sitemap" "$SITE_URL/sitemap.xml" || true)"
+if grep -q "$EXPECTED" "$PARKED.sitemap" 2>/dev/null; then
+  echo "Live: $SITE_URL serves the snapshot generated $EXPECTED UTC." | tee -a "$LOG"
+elif grep -qi "x-vercel-mitigated" <<<"$HEADERS"; then
+  echo "Couldn't read $SITE_URL from this script: Vercel's firewall answered with a challenge" | tee -a "$LOG"
+  echo "(normal browsers pass it). Open the site in a browser to eyeball the new data." | tee -a "$LOG"
+else
+  echo "$SITE_URL doesn't show the snapshot generated $EXPECTED UTC yet; recheck in a few minutes." | tee -a "$LOG"
+fi
+rm -f "$PARKED.sitemap"
+[[ "$DEPLOY" == "success" ]] && exit 0 || exit 1

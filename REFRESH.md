@@ -32,8 +32,11 @@ It takes about 5–10 minutes. Everything it prints is also saved to
    always put back.
 5. **Publish.** Commits only the snapshot and pushes `main`. Vercel deploys `main`
    on its own.
-6. **Confirm.** Waits until clubhubvictoria.ca's sitemap shows the new snapshot
-   time.
+6. **Confirm.** Waits for Vercel's deploy status on the pushed commit (read from
+   GitHub with `gh`), then checks that the live sitemap shows the new snapshot
+   time. Vercel's firewall sometimes answers scripts with a challenge (403,
+   `x-vercel-mitigated`). The script says so, and it isn't a failed deploy; open
+   the site in a browser to look.
 
 ## Options
 
