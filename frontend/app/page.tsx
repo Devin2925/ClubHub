@@ -1,7 +1,7 @@
 import HomeClient, { type HomeClientProps } from "./HomeClient";
 import { DEMO_MODE } from "./lib/demo";
 import { getDemoStatus, getUnfinishedEvents, slimEvent } from "./lib/snapshot.server";
-import { pickDefaultDate, readDateParam, readParam, scheduleDates } from "./lib/schedule";
+import { buildCatalog, pickDefaultDate, readDateParam, readParam, scheduleDates } from "./lib/schedule";
 import { getDateKey, nowScheduleKey } from "./lib/utils";
 
 const INITIAL_EVENT_LIMIT = 80;
@@ -36,9 +36,7 @@ export default async function HomePage({ searchParams }: Props) {
   // Render the day the visitor will see first (from the link, or today) on the
   // server so phones show sessions without waiting for the full schedule.
   const upcoming = getUnfinishedEvents(now);
-  const catalog = Array.from(
-    new Map(upcoming.map((event) => [`${event.municipality}|${event.venue_name}`, [event.municipality, event.venue_name] as [string, string]])).values()
-  );
+  const catalog = buildCatalog(upcoming);
   const placeEvents = upcoming.filter((event) => {
     if (initialQuery.municipality && event.municipality !== initialQuery.municipality) return false;
     if (initialQuery.venue && event.venue_name !== initialQuery.venue) return false;

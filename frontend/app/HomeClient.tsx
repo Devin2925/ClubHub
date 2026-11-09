@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
@@ -25,6 +26,8 @@ import {
   scheduleDates,
   scheduleSearch,
   dayChipLabel,
+  buildCatalog,
+  type CatalogVenue,
   type ScheduleQuery,
 } from "./lib/schedule";
 
@@ -45,12 +48,15 @@ export interface StatusData {
   };
 }
 
+// Show this many rec centres before "+ N more places" (City of Vancouver has dozens).
+const VISIBLE_PLACES = 12;
+
 export interface HomeClientProps {
   // Demo mode: the server renders the requested day straight away and the full
   // schedule loads afterwards from /events.json.
   initialEvents: EventData[];
   initialDates: string[];
-  catalog: [string, string][]; // [municipality, venue_name]
+  catalog: CatalogVenue[];
   initialStatus: StatusData | null;
   initialQuery: ScheduleQuery;
   initialNow: string;
@@ -93,8 +99,14 @@ export default function HomeClient({
   const [scrapeMessage, setScrapeMessage] = useState<string | null>(null);
   const [now, setNow] = useState(initialNow);
 
-  const [activeMunicipality, setActiveMunicipality] = useState(initialQuery.municipality || "");
+  // A ?venue= link without ?municipality= still opens that venue's municipality in the picker.
+  const linkedMunicipality =
+    initialQuery.municipality ||
+    (initialQuery.venue ? catalog.find((place) => place.venue === initialQuery.venue)?.municipality : "") ||
+    "";
+  const [activeMunicipality, setActiveMunicipality] = useState(linkedMunicipality);
   const [activeVenue, setActiveVenue] = useState(initialQuery.venue || "");
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
   // null = default to today (or the next day with activities); "" = All Dates
   const [dateSelection, setDateSelection] = useState<string | null>(initialQuery.date ?? null);
   const [activeSport, setActiveSport] = useState(initialQuery.sport || "");
@@ -130,8 +142,7 @@ export default function HomeClient({
       try {
         const saved = JSON.parse(window.localStorage.getItem(REMEMBERED_PLACE_KEY) || "null");
         const known = catalog.some(
-          ([municipality, venue]) =>
-            municipality === saved?.municipality && (!saved?.venue || venue === saved.venue)
+          (place) => place.municipality === saved?.municipality && (!saved?.venue || place.venue === saved.venue)
         );
         if (saved && known) {
           setActiveMunicipality(saved.municipality);
@@ -164,6 +175,7 @@ export default function HomeClient({
   function selectMunicipality(municipality: string) {
     setActiveMunicipality(municipality);
     setActiveVenue("");
+    setShowAllPlaces(false);
     setDateSelection(null);
     setActiveSport("");
     rememberPlace(municipality, "");
@@ -208,23 +220,22 @@ export default function HomeClient({
 
   const upcoming = useMemo(() => events.filter((event) => !hasEnded(event, now)), [events, now]);
 
-  const municipalities = useMemo(() => {
-    const names = new Set(catalog.map(([municipality]) => municipality));
-    for (const event of upcoming) names.add(event.municipality);
-    return Array.from(names).sort();
-  }, [catalog, upcoming]);
+  // The server's catalog covers every upcoming session; without one (API mode) count the loaded schedule.
+  const places = useMemo(() => (catalog.length ? catalog : buildCatalog(upcoming)), [catalog, upcoming]);
 
-  const venues = useMemo(() => {
-    const names = new Set(
-      catalog
-        .filter(([municipality]) => !activeMunicipality || municipality === activeMunicipality)
-        .map(([, venue]) => venue)
-    );
-    for (const event of upcoming) {
-      if (!activeMunicipality || event.municipality === activeMunicipality) names.add(event.venue_name);
-    }
-    return Array.from(names).sort();
-  }, [catalog, upcoming, activeMunicipality]);
+  const municipalities = useMemo(
+    () => Array.from(new Set(places.map((place) => place.municipality))).sort(),
+    [places]
+  );
+
+  // Step two of the picker: the chosen municipality's rec centres, biggest first, then the
+  // places that only host one-off events or camps.
+  const municipalityPlaces = useMemo(() => {
+    const here = places
+      .filter((place) => place.municipality === activeMunicipality)
+      .sort((a, b) => b.sessions - a.sessions || a.venue.localeCompare(b.venue));
+    return { recCentres: here.filter((place) => place.recCentre), otherPlaces: here.filter((place) => !place.recCentre) };
+  }, [places, activeMunicipality]);
 
   const municipalityClosures = VENUE_CLOSURES.filter(
     (closure) => activeMunicipality && closure.municipality === activeMunicipality
@@ -244,7 +255,7 @@ export default function HomeClient({
   // that can't be computed from a single day of events.
   const computedDates = useMemo(() => scheduleDates(placeEvents), [placeEvents]);
   const placeMatchesServer =
-    activeMunicipality === (initialQuery.municipality || "") && activeVenue === (initialQuery.venue || "");
+    activeMunicipality === linkedMunicipality && activeVenue === (initialQuery.venue || "");
   const dates = fullLoaded || !placeMatchesServer ? computedDates : initialDates;
 
   const todayKey = now.slice(0, 10);
@@ -261,6 +272,46 @@ export default function HomeClient({
       .map(([sport, count]) => ({ sport, count }))
       .sort((a, b) => b.count - a.count);
   }, [placeEvents, activeDate]);
+
+  // Sessions per rec centre on the chosen day, shown on the picker tiles once the full schedule is in.
+  const placeDayCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!activeMunicipality || !fullLoaded) return counts;
+    for (const event of upcoming) {
+      if (event.municipality !== activeMunicipality) continue;
+      if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
+      counts.set(event.venue_name, (counts.get(event.venue_name) || 0) + 1);
+    }
+    return counts;
+  }, [upcoming, activeMunicipality, activeDate, fullLoaded]);
+
+  const { recCentres, otherPlaces } = municipalityPlaces;
+  const activePlaceHidden =
+    activeVenue !== "" &&
+    (otherPlaces.some((place) => place.venue === activeVenue) ||
+      recCentres.findIndex((place) => place.venue === activeVenue) >= VISIBLE_PLACES);
+  const placesExpanded = showAllPlaces || activePlaceHidden;
+  const shownRecCentres = placesExpanded ? recCentres : recCentres.slice(0, VISIBLE_PLACES);
+  const hiddenPlaceCount = placesExpanded ? 0 : recCentres.length - shownRecCentres.length + otherPlaces.length;
+  const placeDayLabel = activeDate ? dayChipLabel(activeDate, todayKey).toLowerCase() : "upcoming";
+
+  function placeTile(place: CatalogVenue) {
+    const count = fullLoaded ? placeDayCounts.get(place.venue) || 0 : null;
+    const active = activeVenue === place.venue;
+    return (
+      <button
+        key={place.venue}
+        className={`venue-tile ${active ? "active" : ""} ${count === 0 ? "venue-tile-quiet" : ""}`}
+        onClick={() => selectVenue(active ? "" : place.venue)}
+        aria-pressed={active}
+        title={count === null ? place.venue : `${place.venue}: ${count} ${placeDayLabel}`}
+        type="button"
+      >
+        <span className="venue-tile-name">{place.venue}</span>
+        {count === null ? null : <span className="venue-tile-count">{count}</span>}
+      </button>
+    );
+  }
 
   const filteredEvents = useMemo(() => {
     return placeEvents.filter((event) => {
@@ -362,26 +413,44 @@ export default function HomeClient({
             </div>
           </div>
 
-          <div className="simple-filter-grid">
-            <div className="simple-filter-field">
-              <label className="chip-group-label" htmlFor="venue-select">
-                Rec Centre
-              </label>
-              <select
-                id="venue-select"
-                className="filter-select"
-                value={activeVenue}
-                onChange={(event) => selectVenue(event.target.value)}
-                disabled={municipalities.length === 0}
-              >
-                <option value="">{activeMunicipality ? "All rec centres" : HERO_COPY.allVenues}</option>
-                {venues.map((venue) => (
-                  <option key={venue} value={venue}>
-                    {venue}
-                  </option>
-                ))}
-              </select>
+          <div className="simple-venue-row">
+            <div className="chip-group-label" id="venue-picker-label">
+              {activeMunicipality ? `Rec centres in ${activeMunicipality}` : "Rec Centre"}
             </div>
+            {activeMunicipality ? (
+              <div className="venue-picker" role="group" aria-labelledby="venue-picker-label">
+                <button
+                  className={`venue-tile venue-tile-all ${activeVenue === "" ? "active" : ""}`}
+                  onClick={() => selectVenue("")}
+                  aria-pressed={activeVenue === ""}
+                  type="button"
+                >
+                  <span className="venue-tile-name">All of {activeMunicipality}</span>
+                </button>
+                {shownRecCentres.map(placeTile)}
+                {placesExpanded && otherPlaces.length ? (
+                  <>
+                    <span className="venue-picker-sub">Other places · one-off events and camps</span>
+                    {otherPlaces.map(placeTile)}
+                  </>
+                ) : null}
+                {hiddenPlaceCount > 0 ? (
+                  <button className="venue-tile venue-tile-more" onClick={() => setShowAllPlaces(true)} type="button">
+                    <span className="venue-tile-name">
+                      + {hiddenPlaceCount} more {hiddenPlaceCount === 1 ? "place" : "places"}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="venue-picker-hint">
+                Pick a municipality above to see its rec centres, or browse{" "}
+                <Link className="inline-link" href="/venues">
+                  {HERO_COPY.allVenues.replace(/^All\b/, "all")}
+                </Link>
+                .
+              </p>
+            )}
           </div>
 
           {municipalityClosures.map((closure) => (

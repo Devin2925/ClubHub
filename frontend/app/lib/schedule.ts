@@ -1,5 +1,30 @@
 import { formatDate, getDateKey, type EventData } from "./utils";
 
+// One place with upcoming sessions, for the municipality -> rec centre picker.
+export interface CatalogVenue {
+  municipality: string;
+  venue: string;
+  sessions: number; // upcoming sessions, biggest places first in the picker
+  recCentre: boolean; // runs drop-ins/classes/pickup, not only one-off events or camps
+}
+
+export function buildCatalog(events: EventData[]): CatalogVenue[] {
+  const places = new Map<string, CatalogVenue>();
+  for (const event of events) {
+    const key = `${event.municipality}|${event.venue_name}`;
+    const place = places.get(key) ?? {
+      municipality: event.municipality,
+      venue: event.venue_name,
+      sessions: 0,
+      recCentre: false,
+    };
+    place.sessions += 1;
+    if (event.offering_type !== "event" && event.offering_type !== "camp") place.recCentre = true;
+    places.set(key, place);
+  }
+  return Array.from(places.values());
+}
+
 // Filter state that lives in the URL, so a shared link or a search result opens
 // on the same day and activity. date: null = default (today or the next day with
 // activities), "" = all dates.
