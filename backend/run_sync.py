@@ -20,6 +20,10 @@ from scrapers.oakbay_pdf import OakBayPDFScraper
 from scrapers.oakbay_arena_pdf import OakBayArenaPDFScraper
 from scrapers.oakbay_events import OakBayEventsScraper
 from scrapers.esquimalt_events import EsquimaltEventsScraper
+from scrapers.victoria_events import VictoriaEventsScraper
+from scrapers.wspr_events import WSPREventsScraper
+from scrapers.langford_events import LangfordEventsScraper
+from scrapers.crd_special_events import CRDSpecialEventsScraper
 from scrapers.saanich_events import SaanichEventsScraper
 from scrapers.oakbay_aquatics_pdf import OakBayAquaticsPDFScraper
 from scrapers.pearkes_pdf import PearkesPDFScraper
@@ -378,6 +382,11 @@ def iter_scrapers():
     yield ("saanich_camps", "Saanich Day Camps", "Saanich", SaanichCampsScraper())
     yield ("saanich_events", "Saanich Community Events", "Saanich", SaanichEventsScraper())
     yield ("esquimalt_events", "Esquimalt Community Events Calendar", "Esquimalt", EsquimaltEventsScraper())
+    yield ("victoria_events", "City of Victoria Events Calendar", "Victoria", VictoriaEventsScraper())
+    yield ("wspr_events", "West Shore Parks & Recreation Events Calendar", "West Shore", WSPREventsScraper())
+    yield ("langford_events", "City of Langford Events Calendar", "West Shore", LangfordEventsScraper())
+    yield ("panorama_events", "Panorama Recreation Special Events", "Panorama", CRDSpecialEventsScraper("panorama"))
+    yield ("seaparc_events", "SEAPARC Special Events", "Sooke", CRDSpecialEventsScraper("seaparc"))
     for site in CAMP_SITES:
         yield (
             f"perfectmind_camps_{site['subdomain']}",
