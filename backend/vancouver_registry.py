@@ -2018,6 +2018,34 @@ VANCOUVER_REGISTRY = [
     # --- Township of Langley ---
     venue(
         'Township of Langley',
+        'Aldergrove Community Centre',
+        'PerfectMind (tol.perfectmind.com/23784)',
+        'https://tol.perfectmind.com/23784/Clients/BookMe4?widgetId=58e9cb1a-7309-42f0-bdc4-012ba01751c4',
+        'api',
+        connector='perfectmind_widget',
+        connector_confirmed=True,
+        status='source_verified',
+        priority='high',
+        sports=['skating', 'hockey'],
+        refresh_group='vancouver_discovery',
+        notes='Public skates, sensory skates and stick & puck from the Drop-in / Skating calendar (tol_perfectmind). Checked 2026-11-09.',
+    ),
+    venue(
+        'Township of Langley',
+        'George Preston Recreation Centre',
+        'PerfectMind (tol.perfectmind.com/23784)',
+        'https://tol.perfectmind.com/23784/Clients/BookMe4?widgetId=58e9cb1a-7309-42f0-bdc4-012ba01751c4',
+        'api',
+        connector='perfectmind_widget',
+        connector_confirmed=True,
+        status='source_verified',
+        priority='high',
+        sports=['skating', 'hockey'],
+        refresh_group='vancouver_discovery',
+        notes='Public skates and stick & puck from the Drop-in / Skating calendar (tol_perfectmind). Checked 2026-11-09.',
+    ),
+    venue(
+        'Township of Langley',
         'Township of Langley recreation centres (W.C. Blair, Aldergrove, Walnut Grove, George Preston, Willoughby)',
         'PerfectMind BookMe4 V2 embedded on tol.ca',
         'https://www.tol.ca/en/parks-recreation/drop-in-schedules.aspx',
@@ -2028,7 +2056,7 @@ VANCOUVER_REGISTRY = [
         priority='high',
         sports=['swimming', 'skating', 'hockey', 'fitness'],
         refresh_group='vancouver_discovery',
-        notes='Drop-in schedules (swimming, aquatic fitness, fitness, skating & stick and puck, activities & sports) embed tol.perfectmind.com/23784 widget 58e9cb1a-7309-42f0-bdc4-012ba01751c4 via the newer BookMe4V2 endpoints (GetWidgetFilterGroupsV2, EventFilterGroupsV2). Needs a V2 connector; confirm the venue list from the data.',
+        notes='Drop-in schedules (swimming, aquatic fitness, fitness, skating & stick and puck, activities & sports) embed tol.perfectmind.com/23784 widget 58e9cb1a-7309-42f0-bdc4-012ba01751c4 via the newer BookMe4V2 endpoints (GetWidgetFilterGroupsV2, EventFilterGroupsV2). Only the skating widget (58e9cb1a…) is wired up. Swimming, aquatic fitness, fitness and sports use other widgets embedded on the tol.ca drop-in pages; tol.ca returns 403 to scripts, so get those widget ids from the pages in a browser, then add them to PERFECTMIND_SOURCES.',
     ),
     # --- White Rock ---
     venue(
@@ -2249,11 +2277,11 @@ VANCOUVER_REGISTRY = [
     # --- SFU ---
     venue(
         'SFU',
-        'SFU Recreation (Burnaby campus gyms)',
+        'SFU Recreation (Burnaby campus)',
         'SFU drop-in sports page',
         'https://www.sfu.ca/recreation/sports/dropinsport/drop-in-schedule.html',
         'html',
-        connector='static_html',
+        connector='sfu_schedule_html',
         connector_confirmed=True,
         status='source_verified',
         priority='medium',

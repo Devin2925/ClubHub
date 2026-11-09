@@ -43,6 +43,10 @@ PERFECTMIND_SOURCES = {
     "richmond_perfectmind": {"subdomain": "richmondcity", "municipality": "Richmond", "account_id": "23650", "widget_id": PUBLIC_WIDGET, "display_name": "Richmond PerfectMind"},
     "portmoody_perfectmind": {"subdomain": "cityofportmoody", "municipality": "Port Moody", "account_id": None, "widget_id": PUBLIC_WIDGET, "display_name": "Port Moody PerfectMind"},
     "mapleridge_perfectmind": {"subdomain": "cityofmapleridge", "municipality": "Maple Ridge", "account_id": None, "widget_id": PUBLIC_WIDGET, "display_name": "Maple Ridge PerfectMind"},
+    # Township of Langley: this widget (from tol.ca's skating schedule) only allows the Drop-in /
+    # Skating calendar. Its swim, fitness and sports schedules use other widgets on tol.ca pages,
+    # which block scripted requests; add their widget ids here as more sources.
+    "tol_perfectmind": {"subdomain": "tol", "municipality": "Township of Langley", "account_id": "23784", "widget_id": "58e9cb1a-7309-42f0-bdc4-012ba01751c4", "display_name": "Township of Langley PerfectMind (skating)"},
     "delta_perfectmind": {"subdomain": "cityofdelta", "municipality": "Delta", "account_id": "24140", "widget_id": "0da93182-93fb-4314-87bd-a8ba4ee9a4c9", "display_name": "Delta PerfectMind"},
 }
 

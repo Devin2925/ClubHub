@@ -117,11 +117,14 @@ where it reads from.
 ./update_vancouver.sh --dry-run           # fetch + filter only; lists what the filters dropped
 ```
 
-It scrapes the 13 Metro Vancouver sources into `backend/clubhub_vancouver.db`:
+It scrapes the 15 Metro Vancouver sources into `backend/clubhub_vancouver.db`:
 - four ActiveNet cities (`scrapers/vancouver_activenet.py`)
-- eight PerfectMind cities (`scrapers/vancouver_perfectmind.py`)
+- nine PerfectMind sources (`scrapers/vancouver_perfectmind.py`): eight cities, plus
+  Township of Langley skating only so far
 - UBC Recreation (`scrapers/vancouver_ubc.py`), read from the JSON feed behind
   recreation.ubc.ca's schedule pages
+- SFU Recreation (`scrapers/vancouver_sfu.py`), whose weekly drop-in table repeats
+  until the term ends
 
 Then it runs the same `refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
 `backend/vancouver_registry.py`. If everything is OK it exports
