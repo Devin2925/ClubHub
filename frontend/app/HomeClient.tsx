@@ -58,7 +58,7 @@ export interface HomeClientProps {
 const INITIAL_EVENT_LIMIT = 80;
 const EVENT_LIMIT_STEP = 80;
 const REMEMBERED_PLACE_KEY = "clubhub:place";
-const feedbackEmail = "clubhubvictoria@gmail.com";
+const contactPhone = { display: "203-979-3744", tel: "+12039793744" };
 
 export default function HomeClient({
   initialEvents,
@@ -515,11 +515,11 @@ export default function HomeClient({
             </div>
           </div>
           <div className="trust-card">
-            <div className="trust-kicker">Feedback</div>
+            <div className="trust-kicker">Contact</div>
             <div className="trust-copy">
-              Spot a wrong schedule or missing venue?{" "}
-              <a href={`mailto:${feedbackEmail}?subject=ClubHub schedule issue`} className="inline-link">
-                Report it here
+              Call or text{" "}
+              <a href={`tel:${contactPhone.tel}`} className="inline-link">
+                {contactPhone.display}
               </a>
               .
             </div>

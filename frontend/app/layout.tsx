@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   },
 };
 
-const feedbackEmail = "clubhubvictoria@gmail.com";
+const contactPhone = { display: "203-979-3744", tel: "+12039793744" };
 // Worded the way people search for these venues (Search Console top queries).
 const campPages = [
   { href: "/camps", label: "Kids camps in Victoria" },
@@ -148,7 +148,7 @@ export default function RootLayout({
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
-      email: feedbackEmail,
+      telephone: "+1-203-979-3744",
       areaServed: "CA",
     },
   };
@@ -232,9 +232,12 @@ export default function RootLayout({
             <div className="footer-trust-links">
               <span>Victoria, BC schedule aggregator</span>
               <span>Upcoming dates only</span>
-              <a href={`mailto:${feedbackEmail}?subject=ClubHub feedback`} className="inline-link">
-                Report an issue
-              </a>
+              <span>
+                Contact:{" "}
+                <a href={`tel:${contactPhone.tel}`} className="inline-link">
+                  {contactPhone.display}
+                </a>
+              </span>
             </div>
           </div>
         </footer>
