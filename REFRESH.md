@@ -83,4 +83,28 @@ dip mid-month.
 |---|---|
 | Live database | `backend/clubhub.db` (gitignored; the sync backs it up to `backend/backups/` each run) |
 | Published data | `frontend/data/demo-snapshot.json` |
-| Vancouver (separate) | `backend/vancouver_sync.py` → `backend/clubhub_vancouver.db`; not part of this refresh |
+| Vancouver (separate) | `./update_vancouver.sh` → `backend/clubhub_vancouver.db`; see below |
+
+## ClubHub Vancouver
+
+```sh
+./update_vancouver.sh                     # every source (~5 min)
+./update_vancouver.sh burnaby_activenet   # one source (keys: backend/vancouver_sync.py --list)
+./update_vancouver.sh --dry-run           # fetch + filter only; lists what the filters dropped
+```
+
+It scrapes the 12 Metro Vancouver sources into `backend/clubhub_vancouver.db`. They
+are four ActiveNet cities (`scrapers/vancouver_activenet.py`) and eight PerfectMind
+cities (`scrapers/vancouver_perfectmind.py`). Then it runs the same
+`refresh_report.py` (`--db clubhub_vancouver.db`) and compares the venues with
+`backend/vancouver_registry.py`. Nothing is exported or published yet, and nothing
+touches Victoria.
+
+- **Drop-in filters:** `scrapers/vancouver_common.py` drops private lessons,
+  rentals (including per-court bookings) and closures. Each run's log lists what
+  was dropped and what was kept but looks borderline.
+- **Registry check:** `NOT IN REGISTRY` means add a `VENUE_ALIASES` entry for a
+  spelling difference, or a registry `venue(...)` entry for a new venue.
+  `NO SESSIONS` means the venue closed, was renamed or is off-season.
+- **"go":** in Claude Code, saying "go" runs both refreshes, triages the flags and
+  publishes Victoria (`.claude/skills/go/SKILL.md`).

@@ -2,6 +2,7 @@
 
     ./venv/bin/python refresh_report.py                      # every source's latest run
     ./venv/bin/python refresh_report.py --since "2026-11-09 17:00"   # this refresh only (UTC)
+    ./venv/bin/python refresh_report.py --db clubhub_vancouver.db    # ClubHub Vancouver's sources
 
 Each source gets a verdict:
   OK      ran, returned events, no sharp drop
@@ -31,6 +32,7 @@ KNOWN_NOISE = {
     "perfectmind_victoria": "Crystal Pool closed for good (2026-09-25); only a few City of Victoria rows remain.",
     "cook_street_pdf": "Month-only PDF: counts fall through the month and jump when next month's PDF posts.",
     "jbnh_monthly_pdf": "Month-only PDF: 0 is normal between James Bay New Horizons monthly posts.",
+    # ClubHub Vancouver (clubhub_vancouver.db) sources go here too; keys don't overlap.
 }
 
 # A source that normally lists at least this many should never come back empty.
@@ -72,10 +74,15 @@ def verdict(row: sqlite3.Row, since: datetime | None) -> tuple[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--since", help="Only judge runs completed at/after this UTC time (YYYY-MM-DD HH:MM[:SS])")
+    parser.add_argument("--db", default=str(DB_PATH), help="Database to check (default: Victoria's clubhub.db)")
     args = parser.parse_args()
     since = _parse(args.since) if args.since else None
 
-    conn = sqlite3.connect(DB_PATH)
+    db_path = Path(args.db) if Path(args.db).is_absolute() else Path(__file__).resolve().parent / args.db
+    if not db_path.exists():
+        print(f"No database at {db_path}")
+        return 2
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("select * from source_sync_status order by municipality, source_key").fetchall()
 
