@@ -26,6 +26,7 @@ from scrapers.vancouver_activenet import ACTIVENET_SOURCES, ActiveNetCalendarScr
 from scrapers.vancouver_perfectmind import PERFECTMIND_SOURCES, PerfectMindDropInScraper
 from scrapers.vancouver_ubc import UBC_SOURCES, UBCRecreationScraper
 from scrapers.vancouver_sfu import SFU_SOURCES, SFURecreationScraper
+from scrapers.vancouver_surrey import SURREY_SOURCES, SurreyDropInScraper
 from vancouver_db import VANCOUVER_DB_PATH, VancouverSessionLocal, init_vancouver_db
 from vancouver_registry import VANCOUVER_REGISTRY
 
@@ -34,6 +35,7 @@ SOURCES = {key: (cfg, ActiveNetCalendarScraper) for key, cfg in ACTIVENET_SOURCE
 SOURCES.update({key: (cfg, PerfectMindDropInScraper) for key, cfg in PERFECTMIND_SOURCES.items()})
 SOURCES.update({key: (cfg, UBCRecreationScraper) for key, cfg in UBC_SOURCES.items()})
 SOURCES.update({key: (cfg, SFURecreationScraper) for key, cfg in SFU_SOURCES.items()})
+SOURCES.update({key: (cfg, SurreyDropInScraper) for key, cfg in SURREY_SOURCES.items()})
 
 
 def _record_status(source_key, display_name, municipality, *, ok, count=0, duration_ms=0, note=None):

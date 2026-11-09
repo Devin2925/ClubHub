@@ -39,7 +39,7 @@ They use different databases, so run both in the background and wait for both:
 
 ```sh
 ./update_public_site.sh      # Victoria: scrape, report, export, build, publish, confirm live (5-10 min)
-./update_vancouver.sh        # Vancouver: scrape 15 sources, report, registry check, export, publish, confirm (~5 min)
+./update_vancouver.sh        # Vancouver: scrape 16 sources, report, registry check, export, publish, confirm (~5 min)
 ```
 
 Only Victoria's script runs `next build` locally (Vancouver relies on Vercel's build), so they
@@ -100,6 +100,10 @@ Then decide which case it is:
 - **FAILED `ubc_recreation`:** a UBC schedule page changed its calendar. Copy the new
   `calname`/`location` from that page's `WPFC.data` block into `UBC_CALENDARS` in
   `vancouver_ubc.py`. UBC terms end in early December and April, so counts dip between terms.
+- **FAILED or thin `surrey_dropin`:** it discovers the term PDFs on surrey.ca/dropin by
+  name and reads the term dates from each PDF, so new terms flow in. A FAILED or halved count
+  usually means the PDF layout changed; `surrey_grid.py` reads word positions (venue heading
+  above each PROGRAM..SUNDAY grid). It reads Gym, Youth, Seniors and Arena, not Aquatics.
 - **FAILED `sfu_recreation`:** its page heading must still read like "FALL 2026 (Sept 14 - Dec 4)".
   Between terms it legitimately drops to 0 (add it to `KNOWN_NOISE` then). Update
   `SFU_CLOSED` in `vancouver_sfu.py` with each term's university holidays.
