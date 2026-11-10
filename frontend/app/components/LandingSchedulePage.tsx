@@ -4,7 +4,8 @@ import VenueScheduleClient from "./VenueScheduleClient";
 import { initialSchedule } from "../lib/snapshot.server";
 import { readDateParam, readParam, type EventFilter } from "../lib/schedule";
 import { nowScheduleKey } from "../lib/utils";
-import { serializeJsonLd, SITE_NAME, SITE_URL, snapshotUpdatedLabel } from "../lib/seo";
+import { faqJsonLd, serializeJsonLd, SITE_NAME, SITE_URL, snapshotUpdatedLabel } from "../lib/seo";
+import { IS_VICTORIA } from "../lib/city";
 
 export type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -87,6 +88,25 @@ export default async function LandingSchedulePage({
   const now = nowScheduleKey();
   const schedule = initialSchedule(filter, initialQuery.date, now);
 
+  // Hand-written answers if the page supplied them; otherwise generated ones (Vancouver only,
+  // so Victoria landing pages are unchanged). These show as "Quick answers" and as FAQ data.
+  const faqAnswers =
+    answers?.length || IS_VICTORIA
+      ? answers
+      : [
+          {
+            question: `What does ${collectionName} cover?`,
+            answer: `${summary} There ${schedule.upcoming.length === 1 ? "is" : "are"} ${
+              schedule.upcoming.length
+            } upcoming session${schedule.upcoming.length === 1 ? "" : "s"} listed. Use the date buttons to see today's times.`,
+          },
+          {
+            question: "Does this schedule include today?",
+            answer: "Yes. Pick today or an upcoming date with the date buttons, then filter by venue or activity.",
+          },
+        ];
+  const faq = faqJsonLd(faqAnswers);
+
   const collectionJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -111,6 +131,9 @@ export default async function LandingSchedulePage({
       <div className="container">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
+        {faq ? (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faq) }} />
+        ) : null}
         <Link href={back.path} className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
           {back.name}
         </Link>
@@ -126,7 +149,7 @@ export default async function LandingSchedulePage({
           searchName={shortName}
           pageHeading={heading}
           summary={summary}
-          answers={answers}
+          answers={faqAnswers}
           updatedLabel={snapshotUpdatedLabel()}
           relatedLinks={relatedLinks}
           hideSportFilter={hideSportFilter}

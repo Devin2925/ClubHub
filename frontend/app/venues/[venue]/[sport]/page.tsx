@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CITY } from "../../../lib/city";
+import { CITY, IS_VICTORIA } from "../../../lib/city";
 import VenueScheduleClient from "../../../components/VenueScheduleClient";
 import { DEMO_MODE } from "../../../lib/demo";
 import { getDemoEvents, sessionNotes } from "../../../lib/snapshot.server";
 import { readDateParam, readParam } from "../../../lib/schedule";
 import { API_BASE, EventData, getSportMeta, nowScheduleKey, SPORT_META, venueSlug } from "../../../lib/utils";
 import {
+  faqJsonLd,
   getVenueSearchName,
   getVenueSnapshot,
   getVenueSportSeo,
@@ -105,6 +106,22 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
 
   const page = pageCopy(venue, sport);
   const venueUrl = `${SITE_URL}/venues/${venue}`;
+  const generatedAnswers = events.length
+    ? [
+        {
+          question: `Is there drop-in ${page.label.toLowerCase()} at ${page.displayName}?`,
+          answer: `Yes — ${page.count} upcoming ${page.label.toLowerCase()} session${
+            page.count === 1 ? "" : "s"
+          } at ${page.venueName} in ${page.municipality}, BC. Tap one for its time and how to book.`,
+        },
+        {
+          question: "Does this schedule include today?",
+          answer: "Yes. Use the date buttons to check today or an upcoming date.",
+        },
+      ]
+    : undefined;
+  const answers = page.seo?.answers?.length ? page.seo.answers : IS_VICTORIA ? page.seo?.answers : generatedAnswers;
+  const faq = faqJsonLd(answers);
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -120,6 +137,9 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
     <main className="page">
       <div className="container">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
+        {faq ? (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faq) }} />
+        ) : null}
         <Link href={`/venues/${venue}`} className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
           All {page.displayName} activities
         </Link>
@@ -130,7 +150,7 @@ export default async function VenueSportPage({ params, searchParams }: Props) {
           searchName={getVenueSearchName(venue)}
           pageHeading={page.heading}
           summary={page.summary}
-          answers={page.seo?.answers}
+          answers={answers}
           updatedLabel={snapshotUpdatedLabel()}
           relatedLinks={[
             { href: `/venues/${venue}`, label: `All ${page.displayName} activities` },

@@ -17,6 +17,8 @@ import {
   venueSlug,
 } from "../../lib/utils";
 import {
+  faqJsonLd,
+  getVenueAnswers,
   getVenueSearchName,
   getVenueSeo,
   getVenueSnapshot,
@@ -211,6 +213,9 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
     ],
   };
 
+  const answers = getVenueAnswers(resolvedParams.venue);
+  const faq = faqJsonLd(answers);
+
   return (
     <main className="page">
       <div className="container">
@@ -222,6 +227,9 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
         />
+        {faq ? (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faq) }} />
+        ) : null}
         <Link href="/venues" className="section-link" style={{ marginTop: "1rem", display: "inline-flex" }}>
           Back to venue list
         </Link>
@@ -234,7 +242,7 @@ export default async function VenueDetailPage({ params, searchParams }: Props) {
           pageHeading={pageHeading}
           summary={seo?.summary}
           address={seo?.address}
-          answers={seo?.answers}
+          answers={answers}
           updatedLabel={snapshotUpdatedLabel()}
           relatedLinks={relatedLinks}
           alternatives={alternatives}

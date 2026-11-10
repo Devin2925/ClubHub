@@ -276,6 +276,36 @@ const VANCOUVER_AREA_COPY: Record<string, AreaCopy> = {
   "North Vancouver": { name: "North Vancouver", title: "North Vancouver Drop-In Schedule Today: NVRC" },
   Richmond: { name: "Richmond", title: "Richmond Community Centre Drop-In Schedule Today" },
   Coquitlam: { name: "Coquitlam", title: "Coquitlam Rec Centre Drop-In Schedule Today" },
+  Surrey: {
+    name: "Surrey",
+    title: "Surrey Rec Centre Drop-In Schedule Today",
+    places: "Guildford, Newton, Cloverdale, Fleetwood, South Surrey and Whalley",
+  },
+  Delta: {
+    name: "Delta",
+    title: "Delta Rec Centre Drop-In Schedule Today",
+    places: "Ladner, Tsawwassen and North Delta",
+  },
+  "New Westminster": {
+    name: "New Westminster",
+    title: "New Westminster Drop-In Schedule Today",
+    places: "Uptown and Queensborough",
+  },
+  "Port Coquitlam": { name: "Port Coquitlam", title: "Port Coquitlam (PoCo) Drop-In Schedule Today" },
+  "Port Moody": { name: "Port Moody", title: "Port Moody Drop-In Schedule Today" },
+  "Maple Ridge": { name: "Maple Ridge", title: "Maple Ridge Drop-In Schedule Today", places: "including Albion" },
+  "Langley City": {
+    name: "Langley City",
+    title: "Langley City Drop-In Schedule Today: Timms Community Centre",
+  },
+  "Township of Langley": {
+    name: "Township of Langley",
+    title: "Township of Langley Skating & Arena Drop-In Schedule Today",
+    places: "Aldergrove, Walnut Grove, Willoughby and Brookswood",
+  },
+  "White Rock": { name: "White Rock", title: "White Rock Drop-In Schedule Today" },
+  UBC: { name: "UBC", title: "UBC Recreation Drop-In Schedule Today: Pool, Gym & Fitness" },
+  SFU: { name: "SFU", title: "SFU Recreation Drop-In Sports Schedule Today" },
 };
 
 const AREA_COPY = forCity({ victoria: VICTORIA_AREA_COPY, vancouver: VANCOUVER_AREA_COPY });
