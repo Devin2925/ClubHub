@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CITY } from "../../lib/city";
 import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../components/LandingSchedulePage";
 import { getSportMeta, nowScheduleKey, venueSlug } from "../../lib/utils";
-import { findArea, getAreaCopy, sessionCount, venueCounts, venueListLabel } from "../../lib/searchPages";
+import { areaPages, findArea, getAreaCopy, sessionCount, venueCounts, venueListLabel } from "../../lib/searchPages";
 import { getUnfinishedEvents } from "../../lib/snapshot.server";
 
 type Props = {
@@ -53,7 +53,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// Static at build (bundled-snapshot data). The "unfinished as of now" filtering freezes
+// at build time and is corrected live by the client on hydration; the set of prebuilt
+// areas matches the sitemap's area pages.
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return areaPages().map(({ slug }) => ({ area: slug }));
+}
 
 export default async function AreaPage({ params, searchParams }: Props) {
   const { area } = await params;

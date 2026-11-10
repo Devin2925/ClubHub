@@ -17,6 +17,7 @@ import {
   SITE_URL,
   snapshotUpdatedLabel,
   venueSportCounts,
+  venueSportPages,
 } from "../../../lib/seo";
 
 type Props = {
@@ -71,7 +72,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export const dynamic = "force-dynamic";
+// Static at build (bundled-snapshot data); the client handles live "now" and filters.
+// Prebuilt set matches the sitemap's venue×sport pages (excludes "other").
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return venueSportPages().map(({ venue, sport }) => ({ venue, sport }));
+}
 
 export default async function VenueSportPage({ params, searchParams }: Props) {
   const { venue, sport } = await params;

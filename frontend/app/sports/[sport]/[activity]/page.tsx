@@ -4,6 +4,7 @@ import { CITY } from "../../../lib/city";
 import LandingSchedulePage, { landingMetadata, type SearchParams } from "../../../components/LandingSchedulePage";
 import { getSportMeta, venueSlug } from "../../../lib/utils";
 import {
+  ACTIVITY_PAGES,
   activityPages,
   getActivityPage,
   sessionCount,
@@ -36,7 +37,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// Static at build (bundled-snapshot data); the client handles live "now" and filters.
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return ACTIVITY_PAGES.map(({ sport, slug }) => ({ sport, activity: slug }));
+}
 
 export default async function ActivityPage({ params, searchParams }: Props) {
   const { sport, activity } = await params;

@@ -45,7 +45,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export const dynamic = "force-dynamic";
+// Prerendered at build and served from the CDN: the data is the bundled snapshot,
+// so there is nothing request-specific to compute. force-static makes the page static
+// even though it still accepts searchParams (which it neutralizes to empty); the
+// client fills in live "now" and any ?date=/?sport= filter on hydration.
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return Object.keys(SPORT_META).map((sport) => ({ sport }));
+}
 
 export default async function SportDetailPage({ params, searchParams }: Props) {
   const { sport } = await params;

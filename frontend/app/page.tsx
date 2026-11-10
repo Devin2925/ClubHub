@@ -10,6 +10,13 @@ type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
+// The home page is the most-visited URL, and its data is the bundled snapshot, so
+// prerender it at build and serve from the CDN. force-static neutralizes searchParams
+// (the ?municipality=/?date= deep-link state) and freezes "now" to build time; HomeClient
+// reads the live URL params and current time on hydration. (In dev, pages still render
+// on-demand, so the local backend path keeps working.)
+export const dynamic = "force-static";
+
 export default async function HomePage({ searchParams }: Props) {
   const params = await searchParams;
   const initialQuery: HomeClientProps["initialQuery"] = {

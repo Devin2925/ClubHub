@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Metadata } from "next";
+import snapshot from "@clubhub/snapshot";
 import VenueScheduleClient from "../../components/VenueScheduleClient";
 import CampCard from "../../components/CampCard";
 import { getUpcomingCamps } from "../../lib/campPages.server";
@@ -28,7 +29,7 @@ import {
   venuePageHeading,
   venueSportCounts,
 } from "../../lib/seo";
-import { closureHeadline, getVenueClosure } from "../../lib/closures";
+import { closureHeadline, getVenueClosure, VENUE_CLOSURES } from "../../lib/closures";
 
 type Props = {
   params: Promise<{ venue: string }>;
@@ -86,7 +87,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export const dynamic = "force-dynamic";
+// Static at build (bundled-snapshot data). The closed-venue "nearby" counts freeze at
+// build time (a no-op for open venues) and the client corrects live "now" on hydration.
+// Prebuilt set mirrors the sitemap's venue list (schedule venues + closures, not
+// camp-only / event-only spots).
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  const slugs = new Set<string>();
+  for (const event of snapshot.events || []) {
+    if (event.venue_name && event.offering_type !== "camp" && event.offering_type !== "event") {
+      slugs.add(venueSlug(event.venue_name));
+    }
+  }
+  for (const closure of VENUE_CLOSURES) slugs.add(venueSlug(closure.venueName));
+  return Array.from(slugs).map((venue) => ({ venue }));
+}
 
 export default async function VenueDetailPage({ params, searchParams }: Props) {
   const resolvedParams = await params;
