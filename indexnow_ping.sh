@@ -36,8 +36,11 @@ print(json.dumps({
 PY
 )"
 
+# Bing's endpoint is the canonical one and validates new keys reliably; per the IndexNow
+# protocol a submission to one participating engine is shared with the others (Yandex etc.).
+# (The api.indexnow.org aggregator can 403 a freshly created key even when it is valid.)
 HTTP="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
-  -X POST 'https://api.indexnow.org/indexnow' \
+  -X POST 'https://www.bing.com/indexnow' \
   -H 'Content-Type: application/json; charset=utf-8' \
   --data "$BODY")"
 
