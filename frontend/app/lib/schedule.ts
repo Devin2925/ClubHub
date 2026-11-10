@@ -80,6 +80,26 @@ export function scheduleSearch(query: ScheduleQuery): string {
   return search ? `?${search}` : "";
 }
 
+// The inverse of scheduleSearch: read the filter state back out of a URL search string.
+// Static pages (force-static) render with empty searchParams on the server, so their clients
+// call this on mount to restore the filters a link carried (?date=, ?sport=, ?venue=, ...).
+// `date` is set only when the URL names it, so callers can tell "no date in the link" apart
+// from "date=all".
+export function readScheduleSearch(search: string): ScheduleQuery {
+  const params = new URLSearchParams(search);
+  const query: ScheduleQuery = {};
+  const municipality = readParam(params.get("municipality"));
+  if (municipality) query.municipality = municipality;
+  const venue = readParam(params.get("venue"));
+  if (venue) query.venue = venue;
+  if (params.has("date")) query.date = readDateParam(readParam(params.get("date")));
+  const sport = readParam(params.get("sport"));
+  if (sport) query.sport = sport;
+  const type = readParam(params.get("type"));
+  if (type) query.type = type;
+  return query;
+}
+
 // Keep the address bar in step with the filters without adding history entries.
 export function replaceSearch(query: ScheduleQuery) {
   const url = `${window.location.pathname}${scheduleSearch(query)}${window.location.hash}`;

@@ -18,6 +18,7 @@ import {
   hasEnded,
   isHappeningNow,
   pickDefaultDate,
+  readScheduleSearch,
   replaceSearch,
   scheduleDates,
   scheduleSearch,
@@ -101,6 +102,22 @@ export default function VenueScheduleClient({
   const [now, setNow] = useState(initialNow);
   const [events, setEvents] = useState(initialEvents);
   const [fullLoaded, setFullLoaded] = useState(!loadFilter);
+
+  // Static pages see empty searchParams on the server, so restore the link's filters from
+  // the URL here on mount (after hydration). This runs before the replaceSearch effect
+  // below, which would otherwise write the empty initial state back over the URL.
+  useEffect(() => {
+    let urlQuery: ScheduleQuery = {};
+    try {
+      urlQuery = readScheduleSearch(window.location.search);
+    } catch {
+      // No URL access (shouldn't happen in the browser); the default view still works.
+    }
+    if (urlQuery.date !== undefined) setDateSelection(urlQuery.date);
+    if (!hideSportFilter && urlQuery.sport) setActiveSport(urlQuery.sport);
+    if (urlQuery.type) setActiveOfferingType(urlQuery.type);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!loadFilter) return;

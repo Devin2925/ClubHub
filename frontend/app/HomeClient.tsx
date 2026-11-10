@@ -22,6 +22,7 @@ import {
   hasEnded,
   isHappeningNow,
   pickDefaultDate,
+  readScheduleSearch,
   replaceSearch,
   scheduleDates,
   scheduleSearch,
@@ -145,6 +146,32 @@ export default function HomeClient({
       .catch((error) => console.error("Failed to load schedules", error))
       .finally(() => setLoading(false));
 
+    // Static pages render with empty searchParams, so restore the link's filters from the URL
+    // here on mount (after hydration), before the saved-rec-centre restore below and before the
+    // replaceSearch effect writes state back to the URL. In dev the server seeds the same values.
+    let urlQuery: ScheduleQuery = {};
+    try {
+      urlQuery = readScheduleSearch(window.location.search);
+    } catch {
+      // No URL access; the default view still works.
+    }
+    if (urlQuery.municipality || urlQuery.venue) {
+      const municipality =
+        urlQuery.municipality ||
+        (urlQuery.venue ? catalog.find((place) => place.venue === urlQuery.venue)?.municipality : "") ||
+        "";
+      if (municipality) setActiveMunicipality(municipality);
+      if (urlQuery.venue) setActiveVenue(urlQuery.venue);
+    }
+    if (urlQuery.date !== undefined) setDateSelection(urlQuery.date);
+    if (urlQuery.sport) setActiveSport(urlQuery.sport);
+
+    // A link's filters — from the prop on dynamic pages, or the URL on static ones — take
+    // precedence over this visitor's saved rec centre.
+    const linkHasFilters =
+      Object.values(initialQuery).some((value) => value !== undefined && value !== null) ||
+      Object.values(urlQuery).some((value) => value !== undefined && value !== null);
+
     // Reopen on this visitor's rec centre, unless the link asks for something else.
     try {
       const saved = JSON.parse(window.localStorage.getItem(REMEMBERED_PLACE_KEY) || "null") as SavedPlace | null;
@@ -155,7 +182,6 @@ export default function HomeClient({
         );
       if (saved && known) {
         if (saved.venue) setSavedPlace(saved);
-        const linkHasFilters = Object.values(initialQuery).some((value) => value !== undefined && value !== null);
         if (!linkHasFilters) {
           setActiveMunicipality(saved.municipality);
           setActiveVenue(saved.venue || "");
