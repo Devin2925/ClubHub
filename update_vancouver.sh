@@ -28,6 +28,9 @@ SNAPSHOT="frontend/data/vancouver-snapshot.json"
 SITE_URL="https://clubhubvancouver.ca"
 # The Vercel project that builds ClubHub Vancouver (its deploy status links contain this name).
 VERCEL_PROJECT="clubhub-vancouver"
+# IndexNow key, hosted at frontend/public/<key>.txt. After a confirmed deploy we ping
+# IndexNow so Bing/Yandex recrawl the fresh snapshot fast (best-effort, never fatal).
+INDEXNOW_KEY="3b3716ec38394011928d74b1d93ed9f897fde6e270cb458798a71b17b88722e9"
 
 DRY_RUN=false
 PUBLISH=true
@@ -131,7 +134,11 @@ for _ in $(seq 1 40); do
   sleep 15
 done
 case "$DEPLOY" in
-  success) echo "Vercel deployed $(git rev-parse --short HEAD) to $VERCEL_PROJECT; $SITE_URL is live." | tee -a "$LOG" ;;
+  success)
+    echo "Vercel deployed $(git rev-parse --short HEAD) to $VERCEL_PROJECT; $SITE_URL is live." | tee -a "$LOG"
+    "$ROOT_DIR/indexnow_ping.sh" "$SITE_URL" "$INDEXNOW_KEY" 2>&1 | tee -a "$LOG" \
+      || echo "IndexNow ping failed (non-fatal) - the deploy is still live." | tee -a "$LOG"
+    ;;
   failure|error) echo "Vercel deploy of $(git rev-parse --short HEAD) to $VERCEL_PROJECT FAILED (the previous deploy stays live) - check the Vercel dashboard." | tee -a "$LOG"; exit 1 ;;
   *) echo "No Vercel deploy status for $VERCEL_PROJECT on $(git rev-parse --short HEAD) (project not set up yet, gh not logged in, or still building)." | tee -a "$LOG" ;;
 esac
