@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
 import { DEMO_MODE, fetchDemoEvents } from "./lib/demo";
-import { CITY, forCity } from "./lib/city";
+import { CITY, forCity, IS_VICTORIA } from "./lib/city";
 import {
   API_BASE,
   DISPLAY_TIME_ZONE,
@@ -239,6 +239,26 @@ export default function HomeClient({
     setPickerOpen(false);
   }
 
+  // Dropdown values: "" = everywhere, "area:<municipality>" = a whole municipality (only
+  // offered when a link opened one), otherwise "<municipality>::<venue>".
+  function placeOptionValue(municipality: string, venue: string) {
+    return `${municipality}::${venue}`;
+  }
+
+  function choosePlace(value: string) {
+    setDateSelection(null);
+    setActiveSport("");
+    const place = places.find((candidate) => placeOptionValue(candidate.municipality, candidate.venue) === value);
+    if (place) {
+      setActiveMunicipality(place.municipality);
+      setActiveVenue(place.venue);
+      rememberPlace({ municipality: place.municipality, venue: place.venue });
+      return;
+    }
+    setActiveVenue("");
+    setActiveMunicipality(value.startsWith("area:") ? value.slice("area:".length) : "");
+  }
+
   function openPicker() {
     setShowAllPlaces(false);
     setPickerOpen(true);
@@ -292,6 +312,16 @@ export default function HomeClient({
       .sort((a, b) => b.sessions - a.sessions || a.venue.localeCompare(b.venue));
     return { recCentres: here.filter((place) => place.recCentre), otherPlaces: here.filter((place) => !place.recCentre) };
   }, [places, activeMunicipality]);
+
+  // Victoria picks its rec centre from one A-Z dropdown (about 35 centres); Vancouver's
+  // ~140 venues stay on the municipality-then-tiles picker.
+  const dropdownPlaces = useMemo(() => {
+    const byName = (a: CatalogVenue, b: CatalogVenue) => a.venue.localeCompare(b.venue);
+    return {
+      recCentres: places.filter((place) => place.recCentre).sort(byName),
+      otherPlaces: places.filter((place) => !place.recCentre).sort(byName),
+    };
+  }, [places]);
 
   const municipalityClosures = VENUE_CLOSURES.filter(
     (closure) => activeMunicipality && closure.municipality === activeMunicipality
@@ -353,6 +383,14 @@ export default function HomeClient({
     savedPlace && activeVenue && savedPlace.venue === activeVenue && savedPlace.municipality === activeMunicipality
   );
   const placeCollapsed = activeVenue !== "" && !pickerOpen;
+  const selectedPlaceValue = activeVenue
+    ? placeOptionValue(activeMunicipality, activeVenue)
+    : activeMunicipality
+      ? `area:${activeMunicipality}`
+      : "";
+  const selectedPlaceListed = places.some(
+    (place) => placeOptionValue(place.municipality, place.venue) === selectedPlaceValue
+  );
   const placeDayLabel = activeDate ? dayChipLabel(activeDate, todayKey).toLowerCase() : "upcoming";
 
   function placeTile(place: CatalogVenue) {
@@ -450,7 +488,77 @@ export default function HomeClient({
         </section>
 
         <section className="simple-filter-panel">
-          {placeCollapsed ? (
+          {IS_VICTORIA ? (
+            <>
+              <div className="simple-venue-row rec-centre-dropdown">
+                <label className="chip-group-label" htmlFor="rec-centre-select">
+                  {isSavedPlace ? "Your rec centre" : "Rec centre"}
+                </label>
+                <select
+                  id="rec-centre-select"
+                  className="filter-select rec-centre-select"
+                  value={selectedPlaceValue}
+                  onChange={(event) => choosePlace(event.target.value)}
+                >
+                  <option value="">{HERO_COPY.allVenues}</option>
+                  {activeMunicipality && !activeVenue ? (
+                    <option value={selectedPlaceValue}>All of {activeMunicipality}</option>
+                  ) : null}
+                  {activeVenue && !selectedPlaceListed ? <option value={selectedPlaceValue}>{activeVenue}</option> : null}
+                  <optgroup label="Rec centres">
+                    {dropdownPlaces.recCentres.map((place) => (
+                      <option key={place.venue} value={placeOptionValue(place.municipality, place.venue)}>
+                        {place.venue}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {dropdownPlaces.otherPlaces.length ? (
+                    <optgroup label="Other places · events and camps">
+                      {dropdownPlaces.otherPlaces.map((place) => (
+                        <option key={place.venue} value={placeOptionValue(place.municipality, place.venue)}>
+                          {place.venue}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
+                {isSavedPlace ? (
+                  <p className="rec-centre-note">
+                    Opens here next time.{" "}
+                    <button className="saved-place-forget" onClick={() => rememberPlace(null)} type="button">
+                      Forget
+                    </button>
+                  </p>
+                ) : savedPlace ? (
+                  <div className="saved-place-row">
+                    <button className="saved-place-return" onClick={openSavedPlace} type="button">
+                      ← Back to your rec centre: <strong>{savedPlace.venue}</strong>
+                    </button>
+                    <button className="saved-place-forget" onClick={() => rememberPlace(null)} type="button">
+                      Forget
+                    </button>
+                  </div>
+                ) : activeVenue === "" ? (
+                  <p className="venue-picker-hint">
+                    Or browse the{" "}
+                    <Link className="inline-link" href="/venues">
+                      rec centre list
+                    </Link>{" "}
+                    with addresses.
+                  </p>
+                ) : null}
+              </div>
+
+              {(activeMunicipality ? municipalityClosures : activeVenue ? [] : VENUE_CLOSURES).map((closure) => (
+                <p key={closure.venueName} className="closure-inline-note">
+                  <strong>{closure.venueName}</strong> is {closureHeadline(closure).toLowerCase()}.{" "}
+                  <a className="inline-link" href={`/venues/${venueSlug(closure.venueName)}`}>
+                    Details
+                  </a>
+                </p>
+              ))}
+            </>
+          ) : placeCollapsed ? (
             <div className="place-card">
               <div className="place-card-text">
                 <div className="chip-group-label">{isSavedPlace ? "Your rec centre" : "Rec centre"}</div>
