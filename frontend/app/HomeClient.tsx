@@ -194,7 +194,10 @@ export default function HomeClient({
       // Storage can be blocked (private browsing); the default view still works.
     }
 
-    // Sessions drop off as they finish while the page stays open.
+    // Static pages bake "now" at build time, so sync to the visitor's real clock immediately
+    // on mount — this lands the default date on their actual today, not the build day — then
+    // keep it current so sessions drop off as they finish while the page stays open.
+    setNow(nowScheduleKey());
     const timer = window.setInterval(() => setNow(nowScheduleKey()), 60_000);
     return () => window.clearInterval(timer);
     // Runs once on load; initialQuery and catalog are fixed for the page's lifetime.
