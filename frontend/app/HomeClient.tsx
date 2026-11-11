@@ -261,6 +261,14 @@ export default function HomeClient({
       rememberPlace({ municipality: place.municipality, venue: place.venue });
       return;
     }
+    const closure = VENUE_CLOSURES.find(
+      (candidate) => placeOptionValue(candidate.municipality, candidate.venueName) === value
+    );
+    if (closure) {
+      setActiveMunicipality(closure.municipality);
+      setActiveVenue(closure.venueName);
+      return;
+    }
     setActiveVenue("");
     setActiveMunicipality(value.startsWith("area:") ? value.slice("area:".length) : "");
   }
@@ -323,8 +331,19 @@ export default function HomeClient({
   // ~140 venues stay on the municipality-then-tiles picker.
   const dropdownPlaces = useMemo(() => {
     const byName = (a: CatalogVenue, b: CatalogVenue) => a.venue.localeCompare(b.venue);
+    // Closed rec centres (Crystal Pool) have no sessions, so they're not in the catalog; list
+    // them anyway so picking one explains the closure.
+    const closed = VENUE_CLOSURES.filter((closure) => !places.some((place) => place.venue === closure.venueName)).map(
+      (closure): CatalogVenue & { closed?: boolean } => ({
+        municipality: closure.municipality,
+        venue: closure.venueName,
+        sessions: 0,
+        recCentre: true,
+        closed: true,
+      })
+    );
     return {
-      recCentres: places.filter((place) => place.recCentre).sort(byName),
+      recCentres: [...places.filter((place) => place.recCentre), ...closed].sort(byName),
       otherPlaces: places.filter((place) => !place.recCentre).sort(byName),
     };
   }, [places]);
@@ -394,9 +413,11 @@ export default function HomeClient({
     : activeMunicipality
       ? `area:${activeMunicipality}`
       : "";
-  const selectedPlaceListed = places.some(
+  const selectedPlaceListed = [...places, ...dropdownPlaces.recCentres].some(
     (place) => placeOptionValue(place.municipality, place.venue) === selectedPlaceValue
   );
+  // Victoria shows a closure only once that venue is picked, not on the front page.
+  const activeClosure = IS_VICTORIA ? VENUE_CLOSURES.find((closure) => closure.venueName === activeVenue) : undefined;
   const placeDayLabel = activeDate ? dayChipLabel(activeDate, todayKey).toLowerCase() : "upcoming";
 
   function placeTile(place: CatalogVenue) {
@@ -514,7 +535,7 @@ export default function HomeClient({
                   <optgroup label="Rec centres">
                     {dropdownPlaces.recCentres.map((place) => (
                       <option key={place.venue} value={placeOptionValue(place.municipality, place.venue)}>
-                        {place.venue}
+                        {"closed" in place && place.closed ? `${place.venue} (closed)` : place.venue}
                       </option>
                     ))}
                   </optgroup>
@@ -555,7 +576,7 @@ export default function HomeClient({
                 ) : null}
               </div>
 
-              {(activeMunicipality ? municipalityClosures : activeVenue ? [] : VENUE_CLOSURES).map((closure) => (
+              {(activeClosure ? [activeClosure] : []).map((closure) => (
                 <p key={closure.venueName} className="closure-inline-note">
                   <strong>{closure.venueName}</strong> is {closureHeadline(closure).toLowerCase()}.{" "}
                   <a className="inline-link" href={`/venues/${venueSlug(closure.venueName)}`}>
@@ -746,7 +767,11 @@ export default function HomeClient({
         {groupedEvents.length === 0 ? (
           <div className="empty-state">
             <span className="empty-state-mark">No Results</span>
-            {loading ? "Loading schedules..." : "Nothing left on this day. Try another date or rec centre."}
+            {loading
+              ? "Loading schedules..."
+              : activeClosure
+                ? `${activeClosure.venueName} is ${closureHeadline(activeClosure).toLowerCase()}. Pick another rec centre above, or open Details for the nearest alternatives.`
+                : "Nothing left on this day. Try another date or rec centre."}
           </div>
         ) : (
           groupedEvents.map(([dateKey, dayEvents]) => (
