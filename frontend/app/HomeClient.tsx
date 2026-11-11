@@ -64,6 +64,8 @@ export interface HomeClientProps {
   initialDates: string[];
   catalog: CatalogVenue[];
   initialStatus: StatusData | null;
+  // "Last sync" text formatted on the server, shown while the status is still initialStatus.
+  initialSyncLabel?: string;
   initialQuery: ScheduleQuery;
   initialNow: string;
 }
@@ -94,6 +96,7 @@ export default function HomeClient({
   initialDates,
   catalog,
   initialStatus,
+  initialSyncLabel,
   initialQuery,
   initialNow,
 }: HomeClientProps) {
@@ -479,7 +482,7 @@ export default function HomeClient({
             ) : null}
             <span className="hero-timestamp">
               {status?.last_fetched
-                ? `Last sync: ${formatDateTime(status.last_fetched)}`
+                ? `Last sync: ${status === initialStatus && initialSyncLabel ? initialSyncLabel : formatDateTime(status.last_fetched)}`
                 : "No sync recorded yet"}
             </span>
           </div>

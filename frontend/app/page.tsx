@@ -2,7 +2,7 @@ import HomeClient, { type HomeClientProps } from "./HomeClient";
 import { DEMO_MODE } from "./lib/demo";
 import { getDemoStatus, getUnfinishedEvents, slimEvent } from "./lib/snapshot.server";
 import { buildCatalog, pickDefaultDate, readDateParam, readParam, scheduleDates } from "./lib/schedule";
-import { getDateKey, nowScheduleKey } from "./lib/utils";
+import { formatDateTime, getDateKey, nowScheduleKey } from "./lib/utils";
 
 const INITIAL_EVENT_LIMIT = 80;
 
@@ -57,12 +57,17 @@ export default async function HomePage({ searchParams }: Props) {
       : placeEvents.slice(0, INITIAL_EVENT_LIMIT)
   ).map(slimEvent);
 
+  // Formatted once here so the prerendered "Last sync" text is exactly what the browser
+  // hydrates; a device with older time zone data would otherwise print a different hour.
+  const status = getDemoStatus();
+
   return (
     <HomeClient
       initialEvents={initialEvents}
       initialDates={dates}
       catalog={catalog}
-      initialStatus={getDemoStatus()}
+      initialStatus={status}
+      initialSyncLabel={status.last_fetched ? formatDateTime(status.last_fetched) : ""}
       initialQuery={initialQuery}
       initialNow={now}
     />

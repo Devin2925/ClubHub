@@ -146,9 +146,12 @@ export function formatAges(ages?: string): string {
 }
 
 // Sync timestamps are UTC instants; the backend writes them without an offset.
+// The zone is a fixed "PT": B.C. has been on UTC-7 all year since Nov 2026, and tz data
+// versions label that differently ("PDT" on Vercel's build, "MST" on current phones), which
+// made the server and browser text disagree.
 export function formatDateTime(isoString: string): string {
   const date = new Date(OFFSET_RE.test(isoString.trim()) ? isoString : `${isoString.replace(" ", "T")}Z`);
-  return date.toLocaleString("en-US", {
+  const local = date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -156,8 +159,8 @@ export function formatDateTime(isoString: string): string {
     minute: "2-digit",
     hour12: true,
     timeZone: DISPLAY_TIME_ZONE,
-    timeZoneName: "short",
   });
+  return `${local} PT`;
 }
 
 // Get date key for grouping (YYYY-MM-DD)
