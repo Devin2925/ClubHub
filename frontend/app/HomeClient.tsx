@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import EventCard from "./components/EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./components/SportIcons";
 import { DEMO_MODE, fetchDemoEvents } from "./lib/demo";
@@ -28,6 +28,10 @@ import {
   scheduleSearch,
   dayChipLabel,
   buildCatalog,
+  matchesDate,
+  nextDateWith,
+  weekendDates,
+  WEEKEND,
   type CatalogVenue,
   type ScheduleQuery,
 } from "./lib/schedule";
@@ -375,14 +379,16 @@ export default function HomeClient({
   const availableSports = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of placeEvents) {
-      if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) continue;
       counts.set(event.sport_type, (counts.get(event.sport_type) || 0) + 1);
     }
+    // Keep a chosen activity visible on a day without it, so it can be seen and cleared.
+    if (IS_VICTORIA && activeSport && !counts.has(activeSport)) counts.set(activeSport, 0);
 
     return Array.from(counts.entries())
       .map(([sport, count]) => ({ sport, count }))
       .sort((a, b) => b.count - a.count);
-  }, [placeEvents, activeDate]);
+  }, [placeEvents, activeDate, todayKey, activeSport]);
 
   // Sessions per rec centre on the chosen day, shown on the picker tiles once the full schedule is in.
   const placeDayCounts = useMemo(() => {
@@ -390,11 +396,11 @@ export default function HomeClient({
     if (!activeMunicipality || !fullLoaded) return counts;
     for (const event of upcoming) {
       if (event.municipality !== activeMunicipality) continue;
-      if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) continue;
       counts.set(event.venue_name, (counts.get(event.venue_name) || 0) + 1);
     }
     return counts;
-  }, [upcoming, activeMunicipality, activeDate, fullLoaded]);
+  }, [upcoming, activeMunicipality, activeDate, fullLoaded, todayKey]);
 
   const { recCentres, otherPlaces } = municipalityPlaces;
   const activePlaceHidden =
@@ -440,11 +446,11 @@ export default function HomeClient({
 
   const filteredEvents = useMemo(() => {
     return placeEvents.filter((event) => {
-      if (activeDate && getDateKey(event.start_time) !== activeDate) return false;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) return false;
       if (activeSport && event.sport_type !== activeSport) return false;
       return true;
     });
-  }, [placeEvents, activeDate, activeSport]);
+  }, [placeEvents, activeDate, activeSport, todayKey]);
 
   const groupedEvents = useMemo(() => {
     const groups: Record<string, EventData[]> = {};
@@ -457,6 +463,19 @@ export default function HomeClient({
   }, [filteredEvents, visibleEventLimit]);
 
   const hasMoreEvents = filteredEvents.length > visibleEventLimit;
+
+  // Victoria's "This weekend" chip sits just before the weekend's first day in the strip.
+  const isWeekend = activeDate === WEEKEND;
+  const weekend = weekendDates(todayKey);
+  const weekendChipBefore =
+    IS_VICTORIA && weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
+
+  // An empty day offers a jump to the next day with sessions for this place and activity.
+  const nextDate = useMemo(() => {
+    if (!IS_VICTORIA || !fullLoaded || filteredEvents.length) return null;
+    const matching = activeSport ? placeEvents.filter((event) => event.sport_type === activeSport) : placeEvents;
+    return nextDateWith(matching, activeDate, todayKey);
+  }, [fullLoaded, filteredEvents, placeEvents, activeSport, activeDate, todayKey]);
 
   const query: ScheduleQuery = {
     municipality: activeMunicipality,
@@ -699,18 +718,32 @@ export default function HomeClient({
                 All Dates
               </a>
               {dates.map((date) => (
-                <a
-                  key={date}
-                  className={`chip ${activeDate === date ? "active" : ""}`}
-                  href={scheduleSearch({ ...query, date, sport: "" })}
-                  aria-current={activeDate === date ? "date" : undefined}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    selectDate(date);
-                  }}
-                >
-                  {dayChipLabel(date, todayKey)}
-                </a>
+                <Fragment key={date}>
+                  {date === weekendChipBefore ? (
+                    <a
+                      className={`chip ${isWeekend ? "active" : ""}`}
+                      href={scheduleSearch({ ...query, date: WEEKEND, sport: "" })}
+                      aria-current={isWeekend ? "date" : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        selectDate(WEEKEND);
+                      }}
+                    >
+                      {dayChipLabel(WEEKEND, todayKey)}
+                    </a>
+                  ) : null}
+                  <a
+                    className={`chip ${activeDate === date ? "active" : ""}`}
+                    href={scheduleSearch({ ...query, date, sport: "" })}
+                    aria-current={activeDate === date ? "date" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      selectDate(date);
+                    }}
+                  >
+                    {dayChipLabel(date, todayKey)}
+                  </a>
+                </Fragment>
               ))}
             </div>
           </div>
@@ -771,12 +804,20 @@ export default function HomeClient({
               ? "Loading schedules..."
               : activeClosure
                 ? `${activeClosure.venueName} is ${closureHeadline(activeClosure).toLowerCase()}. Pick another rec centre above, or open Details for the nearest alternatives.`
-                : "Nothing left on this day. Try another date or rec centre."}
+                : nextDate
+                  ? `Nothing ${activeDate === todayKey ? "left today" : "on this day"} for this choice.`
+                  : "Nothing left on this day. Try another date or rec centre."}
+            {nextDate && !activeClosure ? (
+              <button className="empty-state-next" onClick={() => setDateSelection(nextDate.date)} type="button">
+                Next: {dayChipLabel(nextDate.date, todayKey)} · {nextDate.count}{" "}
+                {nextDate.count === 1 ? "session" : "sessions"} →
+              </button>
+            ) : null}
           </div>
         ) : (
           groupedEvents.map(([dateKey, dayEvents]) => (
             <div key={dateKey} className="day-group">
-              {activeDate ? null : (
+              {activeDate && !isWeekend ? null : (
                 <div className="day-group-header">
                   <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
                   <span className="day-count">{dayEvents.length} activities</span>

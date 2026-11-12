@@ -2072,3 +2072,42 @@ a.venue-address {
   font-size: 0.85rem;
   color: var(--text-secondary);
 }
+
+/* "Book ahead" on a session card: reserve or register first (Victoria). */
+.event-meta .event-book-ahead {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--sport-fitness);
+  color: var(--sport-fitness);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* An empty day's jump to the next day with sessions. */
+.empty-state-next {
+  display: block;
+  margin: 1.1rem auto 0;
+  min-height: 46px;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid var(--text-primary);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.empty-state-next:focus-visible {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+@media (hover: hover) {
+  .empty-state-next:hover {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+  }
+}

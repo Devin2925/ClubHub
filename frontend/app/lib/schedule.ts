@@ -53,7 +53,45 @@ export function isHappeningNow(event: EventData, now: string): boolean {
 
 export function readDateParam(value: string | null | undefined): string | null {
   if (value === "all") return "";
+  if (value === WEEKEND) return WEEKEND;
   return value && DATE_RE.test(value) ? value : null;
+}
+
+// The "Weekend" date chip: ?date=weekend means the coming Saturday and Sunday (on a
+// Saturday, today and tomorrow; on a Sunday, just today).
+export const WEEKEND = "weekend";
+
+function shiftDay(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+export function weekendDates(todayKey: string): string[] {
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
+  if (weekday === 0) return [todayKey];
+  const saturday = shiftDay(todayKey, 6 - weekday);
+  return [saturday, shiftDay(saturday, 1)];
+}
+
+// Does a session on dateKey fall in the selected date ("" = all dates)?
+export function matchesDate(selection: string, dateKey: string, todayKey: string): boolean {
+  if (!selection) return true;
+  if (selection === WEEKEND) return weekendDates(todayKey).includes(dateKey);
+  return dateKey === selection;
+}
+
+// For an empty day: the first later day that has a matching session, and how many it has.
+export function nextDateWith(events: EventData[], selection: string, todayKey: string) {
+  if (!selection) return null;
+  const after = selection === WEEKEND ? weekendDates(todayKey).slice(-1)[0] : selection;
+  const counts = new Map<string, number>();
+  for (const event of events) {
+    const key = getDateKey(event.start_time);
+    if (key > after) counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const date = Array.from(counts.keys()).sort()[0];
+  return date ? { date, count: counts.get(date) || 0 } : null;
 }
 
 export function readParam(value: string | string[] | null | undefined): string {
@@ -110,10 +148,9 @@ export function replaceSearch(query: ScheduleQuery) {
 
 // Short enough for a phone-width chip: "Today", "Tomorrow", "Fri, Oct 30".
 export function dayChipLabel(date: string, todayKey: string): string {
+  if (date === WEEKEND) return weekendDates(todayKey).length === 1 ? "Today" : "This weekend";
   if (date === todayKey) return "Today";
-  const [year, month, day] = todayKey.split("-").map(Number);
-  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
-  if (date === tomorrow) return "Tomorrow";
+  if (date === shiftDay(todayKey, 1)) return "Tomorrow";
   return formatDate(`${date}T00:00:00`);
 }
 

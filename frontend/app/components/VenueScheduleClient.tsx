@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import EventCard from "./EventCard";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 import {
@@ -24,9 +24,14 @@ import {
   scheduleSearch,
   dayChipLabel,
   eventMatcher,
+  matchesDate,
+  nextDateWith,
+  weekendDates,
+  WEEKEND,
   type EventFilter,
   type ScheduleQuery,
 } from "../lib/schedule";
+import { IS_VICTORIA } from "../lib/city";
 import { closureHeadline, VenueClosure } from "../lib/closures";
 import { fetchDemoEvents } from "../lib/demo";
 
@@ -165,34 +170,34 @@ export default function VenueScheduleClient({
   const sportCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of upcoming) {
-      if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) continue;
       if (activeOfferingType && event.offering_type !== activeOfferingType) continue;
       counts.set(event.sport_type, (counts.get(event.sport_type) || 0) + 1);
     }
     // Keep a chosen sport visible on days without it, so it can be cleared.
     if (activeSport && !counts.has(activeSport)) counts.set(activeSport, 0);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [upcoming, activeDate, activeOfferingType, activeSport]);
+  }, [upcoming, activeDate, activeOfferingType, activeSport, todayKey]);
 
   const offeringCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const event of upcoming) {
-      if (activeDate && getDateKey(event.start_time) !== activeDate) continue;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) continue;
       if (activeSport && event.sport_type !== activeSport) continue;
       counts.set(event.offering_type, (counts.get(event.offering_type) || 0) + 1);
     }
     if (activeOfferingType && !counts.has(activeOfferingType)) counts.set(activeOfferingType, 0);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [upcoming, activeDate, activeSport, activeOfferingType]);
+  }, [upcoming, activeDate, activeSport, activeOfferingType, todayKey]);
 
   const filteredEvents = useMemo(() => {
     return upcoming.filter((event) => {
-      if (activeDate && getDateKey(event.start_time) !== activeDate) return false;
+      if (!matchesDate(activeDate, getDateKey(event.start_time), todayKey)) return false;
       if (activeSport && event.sport_type !== activeSport) return false;
       if (activeOfferingType && event.offering_type !== activeOfferingType) return false;
       return true;
     });
-  }, [upcoming, activeDate, activeSport, activeOfferingType]);
+  }, [upcoming, activeDate, activeSport, activeOfferingType, todayKey]);
 
   const groupedByDate = useMemo(() => {
     return Object.entries(
@@ -205,13 +210,32 @@ export default function VenueScheduleClient({
     ).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEvents]);
 
-  const activeDateLabel = activeDate ? formatFullDate(`${activeDate}T00:00:00`).replace(/, \d{4}$/, "") : "";
+  const isWeekend = activeDate === WEEKEND;
+  const activeDateLabel = activeDate && !isWeekend ? formatFullDate(`${activeDate}T00:00:00`).replace(/, \d{4}$/, "") : "";
   const viewLabel =
     activeDate === todayKey
       ? `Today, ${activeDateLabel.replace(/^\w+, /, "")}`
-      : activeDate
+      : isWeekend
+        ? dayChipLabel(WEEKEND, todayKey)
+        : activeDate
         ? activeDateLabel
         : "All upcoming dates";
+
+  // Victoria's "This weekend" chip sits just before the weekend's first day in the strip.
+  const weekend = weekendDates(todayKey);
+  const weekendChipBefore =
+    IS_VICTORIA && weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
+
+  // An empty day offers a jump to the next day with sessions matching the other filters.
+  const nextDate = useMemo(() => {
+    if (!IS_VICTORIA || filteredEvents.length) return null;
+    const matching = upcoming.filter(
+      (event) =>
+        (!activeSport || event.sport_type === activeSport) &&
+        (!activeOfferingType || event.offering_type === activeOfferingType)
+    );
+    return nextDateWith(matching, activeDate, todayKey);
+  }, [filteredEvents, upcoming, activeSport, activeOfferingType, activeDate, todayKey]);
 
   const closureNotice = closure ? (
     <section className="closure-notice" role="status">
@@ -329,18 +353,32 @@ export default function VenueScheduleClient({
         <div className="chip-group-label">Dates</div>
         <div className="horizontal-scroller full-width-scroller">
           {dates.map((date) => (
-            <a
-              key={date}
-              className={`chip ${activeDate === date ? "active" : ""}`}
-              href={scheduleSearch({ ...query, date })}
-              aria-current={activeDate === date ? "date" : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                setDateSelection(date);
-              }}
-            >
-              {dayChipLabel(date, todayKey)}
-            </a>
+            <Fragment key={date}>
+              {date === weekendChipBefore ? (
+                <a
+                  className={`chip ${isWeekend ? "active" : ""}`}
+                  href={scheduleSearch({ ...query, date: WEEKEND })}
+                  aria-current={isWeekend ? "date" : undefined}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setDateSelection(WEEKEND);
+                  }}
+                >
+                  {dayChipLabel(WEEKEND, todayKey)}
+                </a>
+              ) : null}
+              <a
+                className={`chip ${activeDate === date ? "active" : ""}`}
+                href={scheduleSearch({ ...query, date })}
+                aria-current={activeDate === date ? "date" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setDateSelection(date);
+                }}
+              >
+                {dayChipLabel(date, todayKey)}
+              </a>
+            </Fragment>
           ))}
           <a
             className={`chip ${activeDate === "" ? "active" : ""}`}
@@ -422,14 +460,22 @@ export default function VenueScheduleClient({
       {groupedByDate.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state-mark">No Results</span>
-          {activeDate === todayKey && upcoming.some((event) => getDateKey(event.start_time) > todayKey)
-            ? "Nothing else on today. Pick another date above."
-            : "No activities match the current filters."}
+          {nextDate
+            ? `Nothing ${activeDate === todayKey ? "else on today" : "on this day"} for these filters.`
+            : activeDate === todayKey && upcoming.some((event) => getDateKey(event.start_time) > todayKey)
+              ? "Nothing else on today. Pick another date above."
+              : "No activities match the current filters."}
+          {nextDate ? (
+            <button className="empty-state-next" onClick={() => setDateSelection(nextDate.date)} type="button">
+              Next: {dayChipLabel(nextDate.date, todayKey)} · {nextDate.count}{" "}
+              {nextDate.count === 1 ? "session" : "sessions"} →
+            </button>
+          ) : null}
         </div>
       ) : (
         groupedByDate.map(([dateKey, dayEvents]) => (
           <div key={dateKey} className="day-group">
-            {activeDate ? null : (
+            {activeDate && !isWeekend ? null : (
               <div className="day-group-header">
                 <span className="day-group-date">{formatFullDate(`${dateKey}T00:00:00`)}</span>
                 <span className="day-count">{dayEvents.length} activities</span>

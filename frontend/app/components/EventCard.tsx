@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { CITY } from "../lib/city";
+import { CITY, IS_VICTORIA } from "../lib/city";
 import {
   EventData,
   formatAges,
@@ -16,6 +16,22 @@ import {
   venueSlug,
 } from "../lib/utils";
 import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
+
+// "Book ahead": the session has to be reserved or registered for, not just walked into.
+// Read from the title (the sources say "Reserved Drop-in", "| Reservable") or a clear line in
+// the description. The scraped registration_required flag also matches phrases like "No
+// registration required" and "Court reserved for walk-up", so it isn't used on its own.
+const BOOK_AHEAD_TITLE = /\breserv(?:ed|able|ation)\b|\bpre-?regist|\bregist(?:er|ration)\s+(?:required|only)\b/i;
+const BOOK_AHEAD_TEXT =
+  /registration is mandatory|\bregistration (?:is )?required|\bmust (?:pre-?)?(?:register|reserve|book)\b|\bbook (?:up to )?\d+ days? in advance|\badvance registration\b/i;
+const NO_BOOKING_TEXT = /\bno (?:pre-?)?registration\b|\bregistration (?:is )?not required\b|\bwalk-?up\b/i;
+
+export function needsBookingAhead(event: EventData): boolean {
+  if (event.offering_type === "camp" || event.offering_type === "event") return false;
+  if (BOOK_AHEAD_TITLE.test(event.title)) return true;
+  const text = event.description || "";
+  return BOOK_AHEAD_TEXT.test(text) && !NO_BOOKING_TEXT.test(text);
+}
 
 interface EventCardProps {
   event: EventData;
@@ -136,6 +152,7 @@ export default function EventCard({
               </>
             )}
             <span>{offering.label}</span>
+            {IS_VICTORIA && needsBookingAhead(event) ? <span className="event-book-ahead">Book ahead</span> : null}
             {event.facility_name ? <span>{event.facility_name}</span> : null}
             {event.price ? (
               <span
