@@ -9,7 +9,7 @@ export const SITE_DESCRIPTION = forCity({
   victoria:
     "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Victoria, BC and Greater Victoria in one place.",
   vancouver:
-    "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Vancouver, Burnaby, Richmond and Metro Vancouver in one place.",
+    "Find drop-in sports, swims, skates, fitness classes, and recreation schedules across Vancouver, BC and Metro Vancouver in one place.",
 });
 
 export type SnapshotEvent = {
