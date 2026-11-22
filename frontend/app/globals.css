@@ -2085,6 +2085,20 @@ a.venue-address {
   white-space: nowrap;
 }
 
+/* A tiny, non-interactive number in the page corner — present, not a contact method. */
+.corner-phone {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  z-index: 1;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* An empty day's jump to the next day with sessions. */
 .empty-state-next {
   display: block;

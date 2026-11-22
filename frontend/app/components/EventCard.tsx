@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { CITY, IS_VICTORIA } from "../lib/city";
+import { CITY } from "../lib/city";
 import {
   EventData,
   formatAges,
@@ -24,7 +24,10 @@ import { GenericSportIcon, SPORT_ICON_COMPONENTS } from "./SportIcons";
 const BOOK_AHEAD_TITLE = /\breserv(?:ed|able|ation)\b|\bpre-?regist|\bregist(?:er|ration)\s+(?:required|only)\b/i;
 const BOOK_AHEAD_TEXT =
   /registration is mandatory|\bregistration (?:is )?required|\bmust (?:pre-?)?(?:register|reserve|book)\b|\bbook (?:up to )?\d+ days? in advance|\badvance registration\b/i;
-const NO_BOOKING_TEXT = /\bno (?:pre-?)?registration\b|\bregistration (?:is )?not required\b|\bwalk-?up\b/i;
+// Guards against false positives: "No registration required", walk-up, hockey drop-ins whose
+// description only says GOALIES must register, and sessions that say drop-ins are permitted.
+const NO_BOOKING_TEXT =
+  /\bno (?:pre-?)?registration\b|\bregistration (?:is )?not required\b|\bwalk-?up\b|\bgoalies? must register\b|\bdrop-?ins? (?:are )?(?:permitted|welcome)\b/i;
 
 export function needsBookingAhead(event: EventData): boolean {
   if (event.offering_type === "camp" || event.offering_type === "event") return false;
@@ -152,7 +155,7 @@ export default function EventCard({
               </>
             )}
             <span>{offering.label}</span>
-            {IS_VICTORIA && needsBookingAhead(event) ? <span className="event-book-ahead">Book ahead</span> : null}
+            {needsBookingAhead(event) ? <span className="event-book-ahead">Book ahead</span> : null}
             {event.facility_name ? <span>{event.facility_name}</span> : null}
             {event.price ? (
               <span

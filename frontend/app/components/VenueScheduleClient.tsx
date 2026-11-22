@@ -30,9 +30,7 @@ import {
   WEEKEND,
   type EventFilter,
   type ScheduleQuery,
-} from "../lib/schedule";
-import { IS_VICTORIA } from "../lib/city";
-import { closureHeadline, VenueClosure } from "../lib/closures";
+} from "../lib/schedule";import { closureHeadline, VenueClosure } from "../lib/closures";
 import { fetchDemoEvents } from "../lib/demo";
 
 interface VenueScheduleClientProps {
@@ -221,14 +219,14 @@ export default function VenueScheduleClient({
         ? activeDateLabel
         : "All upcoming dates";
 
-  // Victoria's "This weekend" chip sits just before the weekend's first day in the strip.
+  // The "This weekend" chip sits just before the weekend's first day in the strip.
   const weekend = weekendDates(todayKey);
   const weekendChipBefore =
-    IS_VICTORIA && weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
+    weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
 
   // An empty day offers a jump to the next day with sessions matching the other filters.
   const nextDate = useMemo(() => {
-    if (!IS_VICTORIA || filteredEvents.length) return null;
+    if (filteredEvents.length) return null;
     const matching = upcoming.filter(
       (event) =>
         (!activeSport || event.sport_type === activeSport) &&

@@ -212,16 +212,6 @@ export default function RootLayout({
       "@type": "AdministrativeArea",
       name: `${CITY.region}, British Columbia`,
     },
-    ...(CITY.contactPhone
-      ? {
-          contactPoint: {
-            "@type": "ContactPoint",
-            contactType: "customer support",
-            telephone: CITY.contactPhone.schema,
-            areaServed: "CA",
-          },
-        }
-      : {}),
   };
   const websiteJsonLd = {
     "@context": "https://schema.org",
@@ -300,17 +290,12 @@ export default function RootLayout({
             <div className="footer-trust-links">
               <span>{CITY.place} schedule aggregator</span>
               <span>Upcoming dates only</span>
-              {CITY.contactPhone ? (
-                <span>
-                  Contact:{" "}
-                  <a href={`tel:${CITY.contactPhone.tel}`} className="inline-link">
-                    {CITY.contactPhone.display}
-                  </a>
-                </span>
-              ) : null}
             </div>
           </div>
         </footer>
+        {CITY.cornerPhone ? (
+          <div className="corner-phone" aria-hidden="true">{CITY.cornerPhone}</div>
+        ) : null}
         <Analytics />
       </body>
     </html>

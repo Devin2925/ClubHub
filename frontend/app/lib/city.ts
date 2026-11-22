@@ -21,9 +21,9 @@ export interface CityConfig {
   searchTerm: string;
   // Whether the site has the /camps section (Victoria's camp providers only).
   hasCamps: boolean;
-  // Shown in the footer, the home page's contact card and the Organization JSON-LD.
-  // None means the site shows no contact details.
-  contactPhone: { display: string; tel: string; schema: string } | null;
+  // A tiny, non-interactive number shown in the bottom-right corner of every page —
+  // just present, not a way to get in touch. None means no corner number.
+  cornerPhone: string | null;
 }
 
 export const CITIES: Record<CityKey, CityConfig> = {
@@ -36,7 +36,7 @@ export const CITIES: Record<CityKey, CityConfig> = {
     region: "Greater Victoria",
     searchTerm: "victoria",
     hasCamps: true,
-    contactPhone: { display: "203-979-3744", tel: "+12039793744", schema: "+1-203-979-3744" },
+    cornerPhone: "203-979-3744",
   },
   vancouver: {
     key: "vancouver",
@@ -47,7 +47,7 @@ export const CITIES: Record<CityKey, CityConfig> = {
     region: "Metro Vancouver",
     searchTerm: "vancouver",
     hasCamps: false,
-    contactPhone: { display: "203-979-3744", tel: "+12039793744", schema: "+1-203-979-3744" },
+    cornerPhone: "203-979-3744",
   },
 };
 

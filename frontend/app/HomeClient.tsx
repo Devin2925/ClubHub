@@ -464,15 +464,15 @@ export default function HomeClient({
 
   const hasMoreEvents = filteredEvents.length > visibleEventLimit;
 
-  // Victoria's "This weekend" chip sits just before the weekend's first day in the strip.
+  // The "This weekend" chip sits just before the weekend's first day in the strip.
   const isWeekend = activeDate === WEEKEND;
   const weekend = weekendDates(todayKey);
   const weekendChipBefore =
-    IS_VICTORIA && weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
+    weekend.length === 2 ? dates.find((date) => weekend.includes(date)) : undefined;
 
   // An empty day offers a jump to the next day with sessions for this place and activity.
   const nextDate = useMemo(() => {
-    if (!IS_VICTORIA || !fullLoaded || filteredEvents.length) return null;
+    if (!fullLoaded || filteredEvents.length) return null;
     const matching = activeSport ? placeEvents.filter((event) => event.sport_type === activeSport) : placeEvents;
     return nextDateWith(matching, activeDate, todayKey);
   }, [fullLoaded, filteredEvents, placeEvents, activeSport, activeDate, todayKey]);
@@ -868,18 +868,6 @@ export default function HomeClient({
               .
             </div>
           </div>
-          {CITY.contactPhone ? (
-            <div className="trust-card">
-              <div className="trust-kicker">Contact</div>
-              <div className="trust-copy">
-                Call or text{" "}
-                <a href={`tel:${CITY.contactPhone.tel}`} className="inline-link">
-                  {CITY.contactPhone.display}
-                </a>
-                .
-              </div>
-            </div>
-          ) : null}
         </section>
       </div>
     </main>
