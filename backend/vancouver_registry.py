@@ -546,7 +546,7 @@ VANCOUVER_REGISTRY = [
         priority='high',
         sports=['swimming'],
         refresh_group='vancouver_discovery',
-        notes="70 sessions over 36 days on 1 calendar(s) (Public Swimming), checked 2026-11-09. Calendar includes 'Pool Closure' entries; filter those out.",
+        notes="70 sessions over 36 days on 1 calendar(s) (Public Swimming), checked 2026-11-09. Calendar includes 'Pool Closure' entries; filter those out. 2026-11-27: 0 upcoming - pool calendar empty while Britannia Community Centre and Rink still publish; possible closure/redevelopment, confirm with Devin.",
     ),
     venue(
         'Vancouver',
@@ -814,7 +814,7 @@ VANCOUVER_REGISTRY = [
         priority='medium',
         sports=['badminton'],
         refresh_group='vancouver_discovery',
-        notes='83 sessions (first page) over 3 days on 1 calendar(s) (Cambie Community Centre), checked 2026-11-09.',
+        notes='83 sessions (first page) over 3 days on 1 calendar(s) (Cambie Community Centre), checked 2026-11-09. 2026-11-27: 0 upcoming - likely a short publishing gap (Richmond posts ~4 weeks ahead), recheck next refresh.',
     ),
     venue(
         'Richmond',
